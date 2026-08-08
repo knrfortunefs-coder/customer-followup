@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="te">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>కస్టమర్ ఫాలో-అప్ యాప్</title>
+<title>Customer Follow-up App</title>
 <style>
   :root{
     --ink:#16233a;
@@ -25,7 +25,7 @@
   *{box-sizing:border-box;}
   body{
     margin:0;
-    font-family:'Noto Sans Telugu','Segoe UI',Arial,sans-serif;
+    font-family:'Segoe UI',Arial,sans-serif;
     background:var(--paper);
     color:var(--ink);
   }
@@ -39,27 +39,15 @@
     flex-wrap:wrap;
     gap:12px;
   }
-  header h1{
-    margin:0;
-    font-size:1.35rem;
-    letter-spacing:.2px;
-  }
-  header .sub{
-    font-size:.8rem;
-    opacity:.75;
-    margin-top:2px;
-  }
+  header h1{margin:0;font-size:1.35rem;letter-spacing:.2px;}
+  header .sub{font-size:.8rem;opacity:.75;margin-top:2px;}
   .headerRight{display:flex;gap:8px;align-items:center;}
   button{
-    font-family:inherit;
-    cursor:pointer;
-    border:none;
-    border-radius:8px;
-    font-size:.88rem;
-    padding:9px 14px;
-    transition:filter .15s, transform .1s;
+    font-family:inherit;cursor:pointer;border:none;border-radius:8px;
+    font-size:.88rem;padding:9px 14px;transition:filter .15s, transform .1s;
   }
   button:active{transform:scale(.97);}
+  button:disabled{opacity:.6;cursor:not-allowed;}
   .btn-primary{background:var(--clay);color:#fff;}
   .btn-primary:hover{filter:brightness(1.08);}
   .btn-ghost{background:rgba(255,255,255,.12);color:#fff;}
@@ -68,68 +56,34 @@
   .btn-secondary:hover{filter:brightness(.97);}
   .btn-outline{background:#fff;border:1px solid var(--line);color:var(--ink);}
   .btn-danger{background:var(--clay-light);color:var(--danger);}
+  .btn-link{background:none;color:var(--teal);padding:4px 0;text-decoration:underline;font-size:.82rem;}
   main{max-width:1100px;margin:0 auto;padding:20px;}
 
-  .stats{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
-    gap:10px;
-    margin-bottom:18px;
-  }
-  .stat{
-    background:var(--card);
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    padding:12px 14px;
-    cursor:pointer;
-    transition:box-shadow .15s, border-color .15s;
-  }
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;cursor:pointer;transition:box-shadow .15s, border-color .15s;}
   .stat:hover{box-shadow:0 3px 10px rgba(28,53,87,.08);border-color:#c9c1ae;}
   .stat.active{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-light);}
   .stat .num{font-size:1.5rem;font-weight:700;color:var(--navy);}
   .stat .lbl{font-size:.74rem;color:var(--muted);margin-top:2px;}
 
-  .toolbar{
-    display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;
-  }
-  input[type=text],input[type=tel],input[type=date],select,textarea{
-    font-family:inherit;
-    border:1px solid var(--line);
-    border-radius:8px;
-    padding:9px 11px;
-    font-size:.9rem;
-    background:#fff;
-    color:var(--ink);
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  input[type=text],input[type=tel],input[type=date],input[type=password],select,textarea{
+    font-family:inherit;border:1px solid var(--line);border-radius:8px;padding:9px 11px;
+    font-size:.9rem;background:#fff;color:var(--ink);
   }
   .toolbar input[type=text]{flex:1;min-width:180px;}
   .toolbar select{min-width:150px;}
 
-  .card{
-    background:var(--card);
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    overflow:hidden;
-  }
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
   table{width:100%;border-collapse:collapse;font-size:.87rem;}
-  th{
-    text-align:left;
-    background:#f1efe8;
-    color:var(--muted);
-    font-weight:600;
-    padding:10px 12px;
-    font-size:.76rem;
-    text-transform:uppercase;
-    letter-spacing:.03em;
-    border-bottom:1px solid var(--line);
-  }
+  th{text-align:left;background:#f1efe8;color:var(--muted);font-weight:600;padding:10px 12px;font-size:.76rem;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--line);}
   td{padding:11px 12px;border-bottom:1px solid #efece3;vertical-align:top;}
   tr:last-child td{border-bottom:none;}
   tr:hover td{background:#faf8f2;}
   .name-cell{font-weight:600;color:var(--navy);}
   .phone-cell{color:var(--muted);font-size:.83rem;}
-  .badge{
-    display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;white-space:nowrap;
-  }
+  .sub-cell{color:var(--muted);font-size:.78rem;margin-top:2px;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;white-space:nowrap;}
   .b-new{background:#e6ecf7;color:#2b4d8f;}
   .b-appt{background:var(--teal-light);color:var(--teal);}
   .b-postponed{background:#fbf0d9;color:var(--warn);}
@@ -150,15 +104,8 @@
   .empty{padding:40px 20px;text-align:center;color:var(--muted);}
   .empty h3{color:var(--ink);margin-bottom:4px;}
 
-  /* modal */
-  .overlay{
-    position:fixed;inset:0;background:rgba(15,32,56,.5);
-    display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;
-  }
-  .modal{
-    background:#fff;border-radius:14px;max-width:480px;width:100%;
-    max-height:88vh;overflow-y:auto;padding:22px;
-  }
+  .overlay{position:fixed;inset:0;background:rgba(15,32,56,.5);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;}
+  .modal{background:#fff;border-radius:14px;max-width:480px;width:100%;max-height:88vh;overflow-y:auto;padding:22px;}
   .modal h2{margin:0 0 4px;font-size:1.1rem;color:var(--navy);}
   .modal .hint{font-size:.8rem;color:var(--muted);margin-bottom:16px;}
   .field{margin-bottom:13px;}
@@ -167,63 +114,70 @@
   .field textarea{min-height:70px;resize:vertical;}
   .modalActions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
 
-  .setupBox{
-    background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px;max-width:520px;margin:60px auto;text-align:center;
-  }
+  .setupBox{background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px;max-width:480px;margin:60px auto;text-align:center;}
   .setupBox h2{color:var(--navy);margin-top:0;}
   .setupBox p{color:var(--muted);font-size:.9rem;line-height:1.6;}
-  .setupBox input{width:100%;margin:14px 0;}
+  .setupBox input{width:100%;margin:10px 0;}
 
-  .toast{
-    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
-    background:var(--navy-deep);color:#fff;padding:11px 20px;border-radius:8px;font-size:.86rem;
-    box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:100;opacity:0;transition:opacity .25s;
-  }
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy-deep);color:#fff;padding:11px 20px;border-radius:8px;font-size:.86rem;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:100;opacity:0;transition:opacity .25s;}
   .toast.show{opacity:1;}
   .loading{text-align:center;padding:40px;color:var(--muted);}
   footer{text-align:center;padding:24px;color:var(--muted);font-size:.75rem;}
-  @media(max-width:640px){
-    table thead{display:none;}
-    table, tbody, tr, td{display:block;width:100%;}
-    tr{border-bottom:2px solid var(--line);padding:10px 0;}
-    td{border:none;padding:4px 0;display:flex;justify-content:space-between;gap:10px;}
-    td::before{content:attr(data-label);font-weight:600;color:var(--muted);font-size:.72rem;text-transform:uppercase;flex-shrink:0;}
-    .rowActions{justify-content:flex-end;}
+
+  /* Lock screen */
+  .lockWrap{
+    position:fixed;inset:0;background:linear-gradient(135deg,var(--navy-deep),var(--navy));
+    display:flex;align-items:center;justify-content:center;z-index:200;padding:20px;
   }
+  .lockBox{background:#fff;border-radius:16px;padding:30px 28px;max-width:360px;width:100%;text-align:center;}
+  .lockBox .icon{font-size:2.2rem;margin-bottom:6px;}
+  .lockBox h2{margin:4px 0 4px;color:var(--navy);font-size:1.2rem;}
+  .lockBox p{color:var(--muted);font-size:.85rem;margin:0 0 16px;}
+  .pinDots{display:flex;gap:12px;justify-content:center;margin:18px 0;}
+  .pinDot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);background:#fff;}
+  .pinDot.filled{background:var(--navy);border-color:var(--navy);}
+  .pinPad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:260px;margin:0 auto;}
+  .pinPad button{background:#f1efe8;color:var(--ink);font-size:1.1rem;padding:16px 0;border-radius:10px;font-weight:600;}
+  .pinPad button:hover{background:#e7e3d8;}
+  .pinPad .pinClear{background:var(--clay-light);color:var(--danger);font-size:.8rem;}
+  .pinPad .pinBack{background:var(--teal-light);color:var(--teal);font-size:.8rem;}
+  .lockError{color:var(--danger);font-size:.82rem;min-height:18px;margin-top:6px;}
 </style>
 </head>
 <body>
 
 <header>
   <div>
-    <h1>📋 కస్టమర్ ఫాలో-అప్ యాప్</h1>
-    <div class="sub">Insurance &amp; Real Estate &amp; Mutual Funds Marketing</div>
+    <h1>📋 Customer Follow-up App</h1>
+    <div class="sub">Insurance &middot; Real Estate &middot; Mutual Funds</div>
   </div>
   <div class="headerRight">
-    <button class="btn-ghost" id="settingsBtn">⚙️ సెట్టింగ్స్</button>
-    <button class="btn-primary" id="addBtn">+ కొత్త కస్టమర్</button>
+    <button class="btn-ghost" id="lockNowBtn" title="Lock now">🔒 Lock</button>
+    <button class="btn-ghost" id="settingsBtn">⚙️ Settings</button>
+    <button class="btn-primary" id="addBtn">+ New Customer</button>
   </div>
 </header>
 
 <main id="app">
-  <div class="loading">లోడ్ అవుతోంది...</div>
+  <div class="loading">Loading...</div>
 </main>
 
-<footer>మీ డేటా మీ Google Sheet లో సురక్షితంగా ఉంటుంది.</footer>
+<footer>Your data is stored safely in your Google Sheet.</footer>
 
 <script>
-/* ================== CONFIG STORAGE (survives reload if window.storage available) ================== */
-let WEBAPP_URL = '';
+/* ================== STORAGE (persists on this hosted site via localStorage) ================== */
+function lsGet(key){ try{ return localStorage.getItem(key); }catch(e){ return null; } }
+function lsSet(key,val){ try{ localStorage.setItem(key,val); }catch(e){} }
+function lsRemove(key){ try{ localStorage.removeItem(key); }catch(e){} }
 
-async function loadConfig(){
-  try{
-    const r = await window.storage.get('config:webapp_url');
-    if(r && r.value) WEBAPP_URL = r.value;
-  }catch(e){ /* no persistence available - user re-enters this session */ }
-}
-async function saveConfig(url){
-  WEBAPP_URL = url;
-  try{ await window.storage.set('config:webapp_url', url); }catch(e){ /* ignore */ }
+let WEBAPP_URL = lsGet('cf_webapp_url') || 'https://script.google.com/macros/s/AKfycbzRJ5vwe2IECh7U4rVcmpBzso58GiY7mkE5S98fqj9zxduvSXLh2tOUq0oaVy1Cp-wZ/exec';
+function saveConfig(url){ WEBAPP_URL = url; lsSet('cf_webapp_url', url); }
+
+/* ================== SIMPLE HASH (for PIN / security answer, not for storing customer data) ================== */
+async function sha256(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
 /* ================== STATE ================== */
@@ -232,22 +186,30 @@ let filterStatus = 'ALL';
 let searchText = '';
 
 const STATUS_LIST = [
-  {key:'New', label:'కొత్త కస్టమర్', cls:'b-new'},
-  {key:'Appointment Fixed', label:'అపాయింట్‌మెంట్ ఫిక్స్', cls:'b-appt'},
-  {key:'Postponed', label:'వాయిదా పడింది', cls:'b-postponed'},
-  {key:'Met - Interested', label:'కలిశాం - ఆసక్తి ఉంది', cls:'b-metint'},
-  {key:'Met - Not Interested', label:'కలిశాం - ఆసక్తి లేదు', cls:'b-metno'},
-  {key:'Not Reachable', label:'కాంటాక్ట్ కాలేదు', cls:'b-missed'},
-  {key:'Converted', label:'డీల్ అయింది ✅', cls:'b-converted'},
-  {key:'Rejected', label:'వద్దన్నారు', cls:'b-rejected'}
+  {key:'New', label:'New', cls:'b-new'},
+  {key:'Appointment Fixed', label:'Appointment Fixed', cls:'b-appt'},
+  {key:'Postponed', label:'Postponed', cls:'b-postponed'},
+  {key:'Met - Interested', label:'Met - Interested', cls:'b-metint'},
+  {key:'Met - Not Interested', label:'Met - Not Interested', cls:'b-metno'},
+  {key:'Not Reachable', label:'Not Reachable', cls:'b-missed'},
+  {key:'Converted', label:'Converted ✅', cls:'b-converted'},
+  {key:'Rejected', label:'Rejected', cls:'b-rejected'}
 ];
 function statusMeta(key){ return STATUS_LIST.find(s=>s.key===key) || {label:key,cls:'b-new'}; }
+
+const INSURANCE_TYPES = ['Life Insurance','Health Insurance','Motor Insurance'];
+const INSURANCE_COMPANIES = {
+  'Life Insurance': ['LIC','Axis Max Life','Tata AIA','Other'],
+  'Health Insurance': ['Care Health','Tata AIG','Other'],
+  'Motor Insurance': ['Tata AIG','SBI General','Go Digit','Other']
+};
+const REALESTATE_TYPES = ['Red Sandal Farm Lands','Open Plots','Apartments','Other'];
 
 /* ================== API ================== */
 async function apiList(){
   const res = await fetch(WEBAPP_URL + '?action=list');
   const data = await res.json();
-  if(!data.success) throw new Error(data.message||'లోడ్ కాలేదు');
+  if(!data.success) throw new Error(data.message||'Could not load data');
   return data.data;
 }
 async function apiSend(payload){
@@ -257,7 +219,7 @@ async function apiSend(payload){
     body: JSON.stringify(payload)
   });
   const data = await res.json();
-  if(!data.success) throw new Error(data.message||'సేవ్ కాలేదు');
+  if(!data.success) throw new Error(data.message||'Could not save');
   return data;
 }
 
@@ -268,13 +230,12 @@ function todayStr(){
   const d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-
 function followupTag(dateStr){
   if(!dateStr) return '';
   const today = todayStr();
-  if(dateStr < today) return '<div class="followup-tag fu-overdue">⚠ మిస్ అయింది: '+dateStr+'</div>';
-  if(dateStr === today) return '<div class="followup-tag fu-today">📅 ఈరోజు ఫాలో-అప్</div>';
-  return '<div class="followup-tag fu-future">తదుపరి: '+dateStr+'</div>';
+  if(dateStr < today) return '<div class="followup-tag fu-overdue">⚠ Missed: '+dateStr+'</div>';
+  if(dateStr === today) return '<div class="followup-tag fu-today">📅 Follow-up Today</div>';
+  return '<div class="followup-tag fu-future">Next: '+dateStr+'</div>';
 }
 
 function renderStats(){
@@ -284,11 +245,9 @@ function renderStats(){
   const overdue = customers.filter(c=>c.NextFollowupDate && c.NextFollowupDate < todayStr()).length;
 
   let html = '<div class="stats">';
-  html += statCard('ALL', 'మొత్తం కస్టమర్లు', customers.length);
-  html += statCard('OVERDUE', '⚠ మిస్ అయిన ఫాలో-అప్‌లు', overdue);
-  STATUS_LIST.forEach(s=>{
-    html += statCard(s.key, s.label, counts[s.key]);
-  });
+  html += statCard('ALL', 'Total Customers', customers.length);
+  html += statCard('OVERDUE', '⚠ Missed Follow-ups', overdue);
+  STATUS_LIST.forEach(s=>{ html += statCard(s.key, s.label, counts[s.key]); });
   html += '</div>';
   return html;
 }
@@ -298,10 +257,10 @@ function statCard(key,label,num){
 }
 
 function renderToolbar(){
-  let opts = '<option value="ALL">అన్ని స్టేజ్‌లు</option>';
+  let opts = '<option value="ALL">All Stages</option>';
   STATUS_LIST.forEach(s=> opts += '<option value="'+s.key+'"'+(filterStatus===s.key?' selected':'')+'>'+s.label+'</option>');
   return `<div class="toolbar">
-    <input type="text" id="searchBox" placeholder="పేరు లేదా ఫోన్ నంబర్ వెతకండి..." value="${escapeAttr(searchText)}">
+    <input type="text" id="searchBox" placeholder="Search by name or phone..." value="${escapeAttr(searchText)}">
     <select id="statusFilterSel">${opts}</select>
   </div>`;
 }
@@ -323,27 +282,38 @@ function getFiltered(){
   });
 }
 
+function serviceSummary(c){
+  if(c.Category==='Insurance'){
+    return [c.SubCategory, c.Company].filter(Boolean).join(' · ');
+  }
+  if(c.Category==='Real Estate'){
+    return c.SubCategory || '';
+  }
+  return '';
+}
+
 function renderTable(){
   const list = getFiltered();
   if(list.length===0){
-    return '<div class="card"><div class="empty"><h3>కస్టమర్లు కనబడలేదు</h3><p>కొత్త కస్టమర్‌ని జోడించడానికి పైన "+ కొత్త కస్టమర్" నొక్కండి.</p></div></div>';
+    return '<div class="card"><div class="empty"><h3>No customers found</h3><p>Click "+ New Customer" above to add one.</p></div></div>';
   }
   let rows = list.map(c=>{
     const sm = statusMeta(c.Status);
+    const svc = serviceSummary(c);
     return `<tr>
-      <td data-label="పేరు"><div class="name-cell">${escapeHtml(c.Name)}</div><div class="phone-cell">${escapeHtml(c.Category||'')}</div></td>
-      <td data-label="ఫోన్">${escapeHtml(c.Phone)}</td>
-      <td data-label="స్టేజ్"><span class="badge ${sm.cls}">${sm.label}</span></td>
-      <td data-label="ఫాలో-అప్">${followupTag(c.NextFollowupDate)}</td>
-      <td data-label="నోట్స్">${escapeHtml(c.Notes||'')}</td>
-      <td data-label="చర్యలు"><div class="rowActions">
-        <button class="btn-secondary" onclick="openUpdate('${c.ID}')">అప్‌డేట్</button>
-        <button class="btn-danger" onclick="removeCustomer('${c.ID}','${escapeAttr(c.Name)}')">తొలగించు</button>
+      <td data-label="Name"><div class="name-cell">${escapeHtml(c.Name)}</div><div class="phone-cell">${escapeHtml(c.Category||'')}</div>${svc?'<div class="sub-cell">'+escapeHtml(svc)+'</div>':''}</td>
+      <td data-label="Phone">${escapeHtml(c.Phone)}</td>
+      <td data-label="Stage"><span class="badge ${sm.cls}">${sm.label}</span></td>
+      <td data-label="Follow-up">${followupTag(c.NextFollowupDate)}</td>
+      <td data-label="Notes">${escapeHtml(c.Notes||'')}</td>
+      <td data-label="Actions"><div class="rowActions">
+        <button class="btn-secondary" onclick="openUpdate('${c.ID}')">Update</button>
+        <button class="btn-danger" onclick="removeCustomer('${c.ID}','${escapeAttr(c.Name)}')">Delete</button>
       </div></td>
     </tr>`;
   }).join('');
   return `<div class="card"><table>
-    <thead><tr><th>పేరు</th><th>ఫోన్</th><th>స్టేజ్</th><th>ఫాలో-అప్</th><th>నోట్స్</th><th>చర్యలు</th></tr></thead>
+    <thead><tr><th>Name</th><th>Phone</th><th>Stage</th><th>Follow-up</th><th>Notes</th><th>Actions</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
@@ -362,24 +332,57 @@ function escapeAttr(s){ return escapeHtml(s).replace(/'/g,'&#39;'); }
 
 /* ================== LOAD DATA ================== */
 async function refresh(){
-  app.innerHTML = '<div class="loading">లోడ్ అవుతోంది...</div>';
+  app.innerHTML = '<div class="loading">Loading...</div>';
   try{
     customers = await apiList();
     render();
   }catch(err){
-    app.innerHTML = '<div class="empty"><h3>డేటా లోడ్ కాలేదు</h3><p>'+escapeHtml(err.message)+'</p><p>సెట్టింగ్స్‌లో Web App URL సరిగ్గా ఉందో చెక్ చేయండి.</p></div>';
+    app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
   }
 }
 
 /* ================== ADD / UPDATE MODAL ================== */
+function categoryFieldsHtml(values){
+  const cat = values.Category || 'Insurance';
+  let html = '';
+  if(cat === 'Insurance'){
+    const type = values.SubCategory || INSURANCE_TYPES[0];
+    const companies = INSURANCE_COMPANIES[type] || [];
+    html += `<div class="field"><label>Insurance Type</label><select id="f_subcategory" onchange="onSubcategoryChange()">`
+      + INSURANCE_TYPES.map(t=>`<option value="${t}" ${type===t?'selected':''}>${t}</option>`).join('')
+      + `</select></div>`;
+    html += `<div class="field"><label>Company</label><select id="f_company">`
+      + companies.map(co=>`<option value="${co}" ${values.Company===co?'selected':''}>${co}</option>`).join('')
+      + `</select></div>`;
+  } else if(cat === 'Real Estate'){
+    html += `<div class="field"><label>Property Type</label><select id="f_subcategory">`
+      + REALESTATE_TYPES.map(t=>`<option value="${t}" ${values.SubCategory===t?'selected':''}>${t}</option>`).join('')
+      + `</select></div>`;
+  }
+  return html;
+}
+
+function onCategoryChange(){
+  const cat = document.getElementById('f_category').value;
+  document.getElementById('categoryFieldsWrap').innerHTML = categoryFieldsHtml({Category:cat});
+}
+function onSubcategoryChange(){
+  const type = document.getElementById('f_subcategory').value;
+  const companies = INSURANCE_COMPANIES[type] || [];
+  const sel = document.getElementById('f_company');
+  if(sel){
+    sel.innerHTML = companies.map(co=>`<option value="${co}">${co}</option>`).join('');
+  }
+}
+
 function openAdd(){
   showModal({
-    title:'కొత్త కస్టమర్ జోడించండి',
-    hint:'కస్టమర్ వివరాలు నింపండి',
-    values:{Status:'New'},
+    title:'Add New Customer',
+    hint:'Fill in the customer details',
+    values:{Status:'New', Category:'Insurance'},
     onSave: async (vals)=>{
       await apiSend({action:'add', customer:vals});
-      showToast('కస్టమర్ సేవ్ అయ్యింది ✅');
+      showToast('Customer saved ✅');
       closeModal();
       refresh();
     }
@@ -389,26 +392,26 @@ function openUpdate(id){
   const c = customers.find(x=>x.ID===id);
   if(!c) return;
   showModal({
-    title: c.Name + ' - అప్‌డేట్ చేయండి',
-    hint:'ఈ కస్టమర్‌తో ఏమి జరిగిందో నమోదు చేయండి',
+    title: c.Name + ' - Update',
+    hint:'Record what happened with this customer',
     values: c,
     isUpdate:true,
     onSave: async (vals)=>{
       vals.ID = id;
       await apiSend({action:'update', customer:vals});
-      showToast('అప్‌డేట్ సేవ్ అయ్యింది ✅');
+      showToast('Update saved ✅');
       closeModal();
       refresh();
     }
   });
 }
 async function removeCustomer(id,name){
-  if(!confirm(name + ' ని తొలగించాలా? ఇది వెనక్కి తీసుకోలేం.')) return;
+  if(!confirm('Delete '+name+'? This cannot be undone.')) return;
   try{
     await apiSend({action:'delete', id:id});
-    showToast('తొలగించబడింది');
+    showToast('Deleted');
     refresh();
-  }catch(err){ showToast('తప్పు: '+err.message); }
+  }catch(err){ showToast('Error: '+err.message); }
 }
 
 function showModal({title,hint,values,onSave}){
@@ -418,20 +421,21 @@ function showModal({title,hint,values,onSave}){
     <div class="modal">
       <h2>${escapeHtml(title)}</h2>
       <div class="hint">${escapeHtml(hint)}</div>
-      <div class="field"><label>పేరు *</label><input type="text" id="f_name" value="${escapeAttr(values.Name||'')}" placeholder="కస్టమర్ పేరు"></div>
-      <div class="field"><label>ఫోన్ నంబర్ *</label><input type="tel" id="f_phone" value="${escapeAttr(values.Phone||'')}" placeholder="10 అంకెల నంబర్"></div>
-      <div class="field"><label>కేటగిరీ</label><select id="f_category">
+      <div class="field"><label>Name *</label><input type="text" id="f_name" value="${escapeAttr(values.Name||'')}" placeholder="Customer name"></div>
+      <div class="field"><label>Phone Number *</label><input type="tel" id="f_phone" value="${escapeAttr(values.Phone||'')}" placeholder="10-digit number"></div>
+      <div class="field"><label>Service Category</label><select id="f_category" onchange="onCategoryChange()">
         <option value="Insurance" ${values.Category==='Insurance'?'selected':''}>Insurance</option>
         <option value="Real Estate" ${values.Category==='Real Estate'?'selected':''}>Real Estate</option>
         <option value="Mutual Funds" ${values.Category==='Mutual Funds'?'selected':''}>Mutual Funds</option>
       </select></div>
-      <div class="field"><label>ప్రస్తుత స్టేజ్</label><select id="f_status">${opts}</select></div>
-      <div class="field"><label>అపాయింట్‌మెంట్ తేదీ (ఉంటే)</label><input type="date" id="f_appt" value="${values.AppointmentDate||''}"></div>
-      <div class="field"><label>తదుపరి ఫాలో-అప్ తేదీ</label><input type="date" id="f_next" value="${values.NextFollowupDate||''}"></div>
-      <div class="field"><label>వాళ్ళు ఏమి చెప్పారు / నోట్స్</label><textarea id="f_notes" placeholder="ఉదా: వచ్చే వారం మళ్ళీ కాల్ చేయమన్నారు...">${escapeHtml(values.Notes||'')}</textarea></div>
+      <div id="categoryFieldsWrap">${categoryFieldsHtml(values)}</div>
+      <div class="field"><label>Current Stage</label><select id="f_status">${opts}</select></div>
+      <div class="field"><label>Appointment Date (if any)</label><input type="date" id="f_appt" value="${values.AppointmentDate||''}"></div>
+      <div class="field"><label>Next Follow-up Date</label><input type="date" id="f_next" value="${values.NextFollowupDate||''}"></div>
+      <div class="field"><label>What they said / Notes</label><textarea id="f_notes" placeholder="e.g. Asked to call again next week...">${escapeHtml(values.Notes||'')}</textarea></div>
       <div class="modalActions">
-        <button class="btn-outline" onclick="closeModal()">రద్దు చేయి</button>
-        <button class="btn-primary" id="saveBtn">సేవ్ చేయి</button>
+        <button class="btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary" id="saveBtn">Save</button>
       </div>
     </div>
   </div>`;
@@ -439,22 +443,27 @@ function showModal({title,hint,values,onSave}){
   document.getElementById('saveBtn').addEventListener('click', async ()=>{
     const name = document.getElementById('f_name').value.trim();
     const phone = document.getElementById('f_phone').value.trim();
-    if(!name || !phone){ alert('పేరు మరియు ఫోన్ నంబర్ తప్పనిసరి'); return; }
+    if(!name || !phone){ alert('Name and Phone Number are required'); return; }
+    const category = document.getElementById('f_category').value;
+    const subcatEl = document.getElementById('f_subcategory');
+    const companyEl = document.getElementById('f_company');
     const vals = {
       Name:name, Phone:phone,
-      Category: document.getElementById('f_category').value,
+      Category: category,
+      SubCategory: subcatEl ? subcatEl.value : '',
+      Company: companyEl ? companyEl.value : '',
       Status: document.getElementById('f_status').value,
       AppointmentDate: document.getElementById('f_appt').value,
       NextFollowupDate: document.getElementById('f_next').value,
       Notes: document.getElementById('f_notes').value.trim()
     };
     const btn = document.getElementById('saveBtn');
-    btn.disabled = true; btn.textContent='సేవ్ అవుతోంది...';
+    btn.disabled = true; btn.textContent='Saving...';
     try{
       await onSave(vals);
     }catch(err){
-      alert('తప్పు: '+err.message);
-      btn.disabled=false; btn.textContent='సేవ్ చేయి';
+      alert('Error: '+err.message);
+      btn.disabled=false; btn.textContent='Save';
     }
   });
 }
@@ -467,11 +476,7 @@ function closeModal(){
 let toastTimer;
 function showToast(msg){
   let t = document.getElementById('toast');
-  if(!t){
-    t = document.createElement('div');
-    t.id='toast'; t.className='toast';
-    document.body.appendChild(t);
-  }
+  if(!t){ t = document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
@@ -483,50 +488,253 @@ function openSettings(){
   const html = `
   <div class="overlay" id="overlay">
     <div class="modal">
-      <h2>⚙️ సెట్టింగ్స్</h2>
-      <div class="hint">Google Apps Script Web App URL ఇక్కడ పేస్ట్ చేయండి</div>
+      <h2>⚙️ Settings</h2>
+      <div class="hint">Google Apps Script Web App URL</div>
       <div class="field">
         <label>Web App URL</label>
         <input type="text" id="urlInput" value="${escapeAttr(WEBAPP_URL)}" placeholder="https://script.google.com/macros/s/.../exec">
       </div>
       <div class="modalActions">
-        <button class="btn-outline" onclick="closeModal()">రద్దు చేయి</button>
-        <button class="btn-primary" id="saveUrlBtn">సేవ్ చేసి కనెక్ట్ చేయి</button>
+        <button class="btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn-secondary" id="changePinBtn">Change PIN</button>
+        <button class="btn-primary" id="saveUrlBtn">Save &amp; Connect</button>
       </div>
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
-  document.getElementById('saveUrlBtn').addEventListener('click', async ()=>{
+  document.getElementById('saveUrlBtn').addEventListener('click', ()=>{
     const url = document.getElementById('urlInput').value.trim();
-    if(!url){ alert('URL పేస్ట్ చేయండి'); return; }
-    await saveConfig(url);
+    if(!url){ alert('Please paste a URL'); return; }
+    saveConfig(url);
     closeModal();
     refresh();
   });
+  document.getElementById('changePinBtn').addEventListener('click', ()=>{
+    closeModal();
+    startPinSetupFlow(true);
+  });
 }
-
-/* ================== INIT ================== */
 document.getElementById('addBtn').addEventListener('click', openAdd);
 document.getElementById('settingsBtn').addEventListener('click', openSettings);
+document.getElementById('lockNowBtn').addEventListener('click', ()=> lockApp());
 
-(async function init(){
-  await loadConfig();
+/* ================== APP INIT (after unlock) ================== */
+function initApp(){
   if(!WEBAPP_URL){
     app.innerHTML = `<div class="setupBox">
-      <h2>🔗 మొదటిసారి సెటప్</h2>
-      <p>మీ Google Sheet కి కనెక్ట్ కావడానికి, Apps Script Deploy చేసిన తర్వాత వచ్చే Web App URL ని ఇక్కడ పేస్ట్ చేయండి.</p>
+      <h2>🔗 First-time Setup</h2>
+      <p>Paste the Web App URL you got after deploying the Apps Script, to connect this app to your Google Sheet.</p>
       <input type="text" id="firstUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
-      <button class="btn-primary" id="firstConnectBtn" style="width:100%">కనెక్ట్ చేయి</button>
+      <button class="btn-primary" id="firstConnectBtn" style="width:100%">Connect</button>
     </div>`;
-    document.getElementById('firstConnectBtn').addEventListener('click', async ()=>{
+    document.getElementById('firstConnectBtn').addEventListener('click', ()=>{
       const url = document.getElementById('firstUrlInput').value.trim();
-      if(!url){ alert('URL పేస్ట్ చేయండి'); return; }
-      await saveConfig(url);
+      if(!url){ alert('Please paste a URL'); return; }
+      saveConfig(url);
       refresh();
     });
     return;
   }
   refresh();
+}
+
+/* ================== PIN LOCK SYSTEM ================== */
+const AUTO_LOCK_MS = 5 * 60 * 1000; // 5 minutes
+let inactivityTimer = null;
+let pinBuffer = '';
+let pinMode = null; // 'unlock' | 'setup1' | 'setup2' | 'recoverAnswer' | 'recoverSet1' | 'recoverSet2'
+let tempPin = '';
+let tempSecurityAnswerOk = false;
+
+function getSecurity(){
+  const raw = lsGet('cf_security');
+  return raw ? JSON.parse(raw) : null;
+}
+function saveSecurity(sec){ lsSet('cf_security', JSON.stringify(sec)); }
+
+function resetInactivityTimer(){
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(()=> lockApp(), AUTO_LOCK_MS);
+}
+['mousemove','keydown','click','touchstart','scroll'].forEach(evt=>{
+  document.addEventListener(evt, ()=>{ if(!document.getElementById('lockWrap')) resetInactivityTimer(); });
+});
+
+function lockApp(){
+  clearTimeout(inactivityTimer);
+  renderLockScreen('unlock');
+}
+
+function renderLockScreen(mode, opts){
+  opts = opts || {};
+  pinMode = mode;
+  pinBuffer = '';
+  let title, sub, showForgot = false, showPad = true;
+
+  if(mode === 'setup1'){
+    title = 'Create a PIN'; sub = 'Choose a 4-digit PIN to protect this app';
+  } else if(mode === 'setup2'){
+    title = 'Confirm PIN'; sub = 'Enter the same PIN again';
+  } else if(mode === 'unlock'){
+    title = 'Enter PIN'; sub = 'Enter your 4-digit PIN to continue'; showForgot = true;
+  } else if(mode === 'recoverAnswer'){
+    title = 'Forgot PIN'; sub = opts.question || 'Answer your security question'; showPad = false;
+  } else if(mode === 'recoverSet1'){
+    title = 'Set New PIN'; sub = 'Choose a new 4-digit PIN';
+  } else if(mode === 'recoverSet2'){
+    title = 'Confirm New PIN'; sub = 'Enter the new PIN again';
+  } else if(mode === 'securitySetup'){
+    title = 'Security Question'; sub = 'Set a recovery question in case you forget your PIN'; showPad = false;
+  }
+
+  let inner = `
+    <div class="icon">🔒</div>
+    <h2>${title}</h2>
+    <p>${sub}</p>
+  `;
+
+  if(showPad){
+    inner += `<div class="pinDots" id="pinDots">${'<div class="pinDot"></div>'.repeat(4)}</div>`;
+    inner += `<div class="lockError" id="lockError"></div>`;
+    inner += `<div class="pinPad">`;
+    for(let i=1;i<=9;i++) inner += `<button onclick="pinPress('${i}')">${i}</button>`;
+    inner += `<button class="pinClear" onclick="pinClearAll()">Clear</button>`;
+    inner += `<button onclick="pinPress('0')">0</button>`;
+    inner += `<button class="pinBack" onclick="pinBackspace()">⌫</button>`;
+    inner += `</div>`;
+    if(showForgot) inner += `<div style="margin-top:16px;"><button class="btn-link" onclick="startForgotFlow()">Forgot PIN?</button></div>`;
+  } else if(mode === 'recoverAnswer'){
+    inner += `<div class="field" style="text-align:left;"><input type="text" id="recoverAnswerInput" placeholder="Your answer"></div>
+      <div class="lockError" id="lockError"></div>
+      <button class="btn-primary" style="width:100%" onclick="submitRecoverAnswer()">Verify</button>`;
+  } else if(mode === 'securitySetup'){
+    inner += `<div class="field" style="text-align:left;"><label>Security Question</label>
+      <input type="text" id="secQuestionInput" placeholder="e.g. Your first business partner's name?"></div>
+      <div class="field" style="text-align:left;"><label>Answer</label>
+      <input type="text" id="secAnswerInput" placeholder="Your answer"></div>
+      <div class="lockError" id="lockError"></div>
+      <button class="btn-primary" style="width:100%" onclick="submitSecuritySetup()">Save &amp; Finish</button>`;
+  }
+
+  const html = `<div class="lockWrap" id="lockWrap"><div class="lockBox">${inner}</div></div>`;
+  const existing = document.getElementById('lockWrap');
+  if(existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function updatePinDots(){
+  const dots = document.querySelectorAll('#pinDots .pinDot');
+  dots.forEach((d,i)=> d.classList.toggle('filled', i < pinBuffer.length));
+}
+function pinClearAll(){ pinBuffer=''; updatePinDots(); setLockError(''); }
+function pinBackspace(){ pinBuffer = pinBuffer.slice(0,-1); updatePinDots(); }
+function setLockError(msg){ const el = document.getElementById('lockError'); if(el) el.textContent = msg; }
+
+async function pinPress(digit){
+  if(pinBuffer.length>=4) return;
+  pinBuffer += digit;
+  updatePinDots();
+  if(pinBuffer.length===4){
+    await handlePinComplete();
+  }
+}
+
+async function handlePinComplete(){
+  const hash = await sha256(pinBuffer);
+  if(pinMode === 'setup1'){
+    tempPin = pinBuffer;
+    renderLockScreen('setup2');
+  } else if(pinMode === 'setup2'){
+    if(pinBuffer === tempPin){
+      const pinHash = await sha256(tempPin);
+      const existingSec = getSecurity();
+      if(existingSec && existingSec.securityQuestion){
+        // Changing PIN only - keep existing security question/answer
+        existingSec.pinHash = pinHash;
+        saveSecurity(existingSec);
+        showToast('PIN updated ✅');
+        document.getElementById('lockWrap').remove();
+        resetInactivityTimer();
+      } else {
+        renderSecuritySetupWithPin(pinHash);
+      }
+    } else {
+      setLockError('PINs did not match. Try again.');
+      setTimeout(()=> renderLockScreen('setup1'), 900);
+    }
+  } else if(pinMode === 'unlock'){
+    const sec = getSecurity();
+    if(sec && hash === sec.pinHash){
+      document.getElementById('lockWrap').remove();
+      resetInactivityTimer();
+    } else {
+      setLockError('Incorrect PIN');
+      pinBuffer=''; updatePinDots();
+    }
+  } else if(pinMode === 'recoverSet1'){
+    tempPin = pinBuffer;
+    renderLockScreen('recoverSet2');
+  } else if(pinMode === 'recoverSet2'){
+    if(pinBuffer === tempPin){
+      const sec = getSecurity();
+      sec.pinHash = await sha256(tempPin);
+      saveSecurity(sec);
+      showToast('PIN updated ✅');
+      document.getElementById('lockWrap').remove();
+      resetInactivityTimer();
+    } else {
+      setLockError('PINs did not match. Try again.');
+      setTimeout(()=> renderLockScreen('recoverSet1'), 900);
+    }
+  }
+}
+
+let pendingPinHash = '';
+function renderSecuritySetupWithPin(pinHash){
+  pendingPinHash = pinHash;
+  renderLockScreen('securitySetup');
+}
+async function submitSecuritySetup(){
+  const q = document.getElementById('secQuestionInput').value.trim();
+  const a = document.getElementById('secAnswerInput').value.trim();
+  if(!q || !a){ setLockError('Please fill both fields'); return; }
+  const answerHash = await sha256(a.toLowerCase());
+  saveSecurity({ pinHash: pendingPinHash, securityQuestion: q, securityAnswerHash: answerHash });
+  showToast('PIN set up ✅');
+  document.getElementById('lockWrap').remove();
+  resetInactivityTimer();
+}
+
+function startForgotFlow(){
+  const sec = getSecurity();
+  if(!sec){ return; }
+  renderLockScreen('recoverAnswer', {question: sec.securityQuestion});
+}
+async function submitRecoverAnswer(){
+  const val = document.getElementById('recoverAnswerInput').value.trim().toLowerCase();
+  const sec = getSecurity();
+  const hash = await sha256(val);
+  if(hash === sec.securityAnswerHash){
+    renderLockScreen('recoverSet1');
+  } else {
+    setLockError('That answer is not correct. Try again.');
+  }
+}
+
+// Used from Settings > Change PIN (only reachable when already unlocked)
+function startPinSetupFlow(isChange){
+  renderLockScreen('setup1');
+}
+
+/* ================== BOOT ================== */
+(function boot(){
+  const sec = getSecurity();
+  if(!sec){
+    renderLockScreen('setup1');
+  } else {
+    renderLockScreen('unlock');
+  }
+  initApp();
 })();
 </script>
 </body>
