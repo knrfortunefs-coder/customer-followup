@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>కస్టమర్ ఫాలో-అప్ యాప్</title>
+<style>
+  :root{
+    --ink:#16233a;
+    --navy:#1c3557;
+    --navy-deep:#0f2038;
+    --teal:#0f7a6b;
+    --teal-light:#e4f4f1;
+    --clay:#c9622f;
+    --clay-light:#fbeadf;
+    --paper:#f6f4ef;
+    --card:#ffffff;
+    --line:#e3ddd0;
+    --muted:#736b5c;
+    --danger:#b3402f;
+    --ok:#1f7a4d;
+    --warn:#b8862d;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Noto Sans Telugu','Segoe UI',Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  header{
+    background:linear-gradient(135deg,var(--navy-deep),var(--navy));
+    color:#fff;
+    padding:22px 20px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  header h1{
+    margin:0;
+    font-size:1.35rem;
+    letter-spacing:.2px;
+  }
+  header .sub{
+    font-size:.8rem;
+    opacity:.75;
+    margin-top:2px;
+  }
+  .headerRight{display:flex;gap:8px;align-items:center;}
+  button{
+    font-family:inherit;
+    cursor:pointer;
+    border:none;
+    border-radius:8px;
+    font-size:.88rem;
+    padding:9px 14px;
+    transition:filter .15s, transform .1s;
+  }
+  button:active{transform:scale(.97);}
+  .btn-primary{background:var(--clay);color:#fff;}
+  .btn-primary:hover{filter:brightness(1.08);}
+  .btn-ghost{background:rgba(255,255,255,.12);color:#fff;}
+  .btn-ghost:hover{background:rgba(255,255,255,.2);}
+  .btn-secondary{background:var(--teal-light);color:var(--teal);}
+  .btn-secondary:hover{filter:brightness(.97);}
+  .btn-outline{background:#fff;border:1px solid var(--line);color:var(--ink);}
+  .btn-danger{background:var(--clay-light);color:var(--danger);}
+  main{max-width:1100px;margin:0 auto;padding:20px;}
+
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .stat{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:12px 14px;
+    cursor:pointer;
+    transition:box-shadow .15s, border-color .15s;
+  }
+  .stat:hover{box-shadow:0 3px 10px rgba(28,53,87,.08);border-color:#c9c1ae;}
+  .stat.active{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-light);}
+  .stat .num{font-size:1.5rem;font-weight:700;color:var(--navy);}
+  .stat .lbl{font-size:.74rem;color:var(--muted);margin-top:2px;}
+
+  .toolbar{
+    display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;
+  }
+  input[type=text],input[type=tel],input[type=date],select,textarea{
+    font-family:inherit;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:9px 11px;
+    font-size:.9rem;
+    background:#fff;
+    color:var(--ink);
+  }
+  .toolbar input[type=text]{flex:1;min-width:180px;}
+  .toolbar select{min-width:150px;}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  table{width:100%;border-collapse:collapse;font-size:.87rem;}
+  th{
+    text-align:left;
+    background:#f1efe8;
+    color:var(--muted);
+    font-weight:600;
+    padding:10px 12px;
+    font-size:.76rem;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    border-bottom:1px solid var(--line);
+  }
+  td{padding:11px 12px;border-bottom:1px solid #efece3;vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#faf8f2;}
+  .name-cell{font-weight:600;color:var(--navy);}
+  .phone-cell{color:var(--muted);font-size:.83rem;}
+  .badge{
+    display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;white-space:nowrap;
+  }
+  .b-new{background:#e6ecf7;color:#2b4d8f;}
+  .b-appt{background:var(--teal-light);color:var(--teal);}
+  .b-postponed{background:#fbf0d9;color:var(--warn);}
+  .b-metint{background:#e3f4e6;color:var(--ok);}
+  .b-metno{background:#f2e6e2;color:#8a5a4a;}
+  .b-missed{background:var(--clay-light);color:var(--danger);}
+  .b-converted{background:#1f7a4d;color:#fff;}
+  .b-rejected{background:#e9e5dd;color:#8a8378;}
+
+  .followup-tag{font-size:.76rem;padding:2px 8px;border-radius:6px;display:inline-block;margin-top:4px;}
+  .fu-overdue{background:var(--clay-light);color:var(--danger);font-weight:600;}
+  .fu-today{background:#fbf0d9;color:var(--warn);font-weight:600;}
+  .fu-future{background:#f1efe8;color:var(--muted);}
+
+  .rowActions{display:flex;gap:6px;flex-wrap:wrap;}
+  .rowActions button{padding:6px 10px;font-size:.78rem;}
+
+  .empty{padding:40px 20px;text-align:center;color:var(--muted);}
+  .empty h3{color:var(--ink);margin-bottom:4px;}
+
+  /* modal */
+  .overlay{
+    position:fixed;inset:0;background:rgba(15,32,56,.5);
+    display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;
+  }
+  .modal{
+    background:#fff;border-radius:14px;max-width:480px;width:100%;
+    max-height:88vh;overflow-y:auto;padding:22px;
+  }
+  .modal h2{margin:0 0 4px;font-size:1.1rem;color:var(--navy);}
+  .modal .hint{font-size:.8rem;color:var(--muted);margin-bottom:16px;}
+  .field{margin-bottom:13px;}
+  .field label{display:block;font-size:.8rem;font-weight:600;color:var(--ink);margin-bottom:5px;}
+  .field input,.field select,.field textarea{width:100%;}
+  .field textarea{min-height:70px;resize:vertical;}
+  .modalActions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
+
+  .setupBox{
+    background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px;max-width:520px;margin:60px auto;text-align:center;
+  }
+  .setupBox h2{color:var(--navy);margin-top:0;}
+  .setupBox p{color:var(--muted);font-size:.9rem;line-height:1.6;}
+  .setupBox input{width:100%;margin:14px 0;}
+
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--navy-deep);color:#fff;padding:11px 20px;border-radius:8px;font-size:.86rem;
+    box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:100;opacity:0;transition:opacity .25s;
+  }
+  .toast.show{opacity:1;}
+  .loading{text-align:center;padding:40px;color:var(--muted);}
+  footer{text-align:center;padding:24px;color:var(--muted);font-size:.75rem;}
+  @media(max-width:640px){
+    table thead{display:none;}
+    table, tbody, tr, td{display:block;width:100%;}
+    tr{border-bottom:2px solid var(--line);padding:10px 0;}
+    td{border:none;padding:4px 0;display:flex;justify-content:space-between;gap:10px;}
+    td::before{content:attr(data-label);font-weight:600;color:var(--muted);font-size:.72rem;text-transform:uppercase;flex-shrink:0;}
+    .rowActions{justify-content:flex-end;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📋 కస్టమర్ ఫాలో-అప్ యాప్</h1>
+    <div class="sub">Insurance &amp; Real Estate &amp; Mutual Funds Marketing</div>
+  </div>
+  <div class="headerRight">
+    <button class="btn-ghost" id="settingsBtn">⚙️ సెట్టింగ్స్</button>
+    <button class="btn-primary" id="addBtn">+ కొత్త కస్టమర్</button>
+  </div>
+</header>
+
+<main id="app">
+  <div class="loading">లోడ్ అవుతోంది...</div>
+</main>
+
+<footer>మీ డేటా మీ Google Sheet లో సురక్షితంగా ఉంటుంది.</footer>
+
+<script>
+/* ================== CONFIG STORAGE (survives reload if window.storage available) ================== */
+let WEBAPP_URL = '';
+
+async function loadConfig(){
+  try{
+    const r = await window.storage.get('config:webapp_url');
+    if(r && r.value) WEBAPP_URL = r.value;
+  }catch(e){ /* no persistence available - user re-enters this session */ }
+}
+async function saveConfig(url){
+  WEBAPP_URL = url;
+  try{ await window.storage.set('config:webapp_url', url); }catch(e){ /* ignore */ }
+}
+
+/* ================== STATE ================== */
+let customers = [];
+let filterStatus = 'ALL';
+let searchText = '';
+
+const STATUS_LIST = [
+  {key:'New', label:'కొత్త కస్టమర్', cls:'b-new'},
+  {key:'Appointment Fixed', label:'అపాయింట్‌మెంట్ ఫిక్స్', cls:'b-appt'},
+  {key:'Postponed', label:'వాయిదా పడింది', cls:'b-postponed'},
+  {key:'Met - Interested', label:'కలిశాం - ఆసక్తి ఉంది', cls:'b-metint'},
+  {key:'Met - Not Interested', label:'కలిశాం - ఆసక్తి లేదు', cls:'b-metno'},
+  {key:'Not Reachable', label:'కాంటాక్ట్ కాలేదు', cls:'b-missed'},
+  {key:'Converted', label:'డీల్ అయింది ✅', cls:'b-converted'},
+  {key:'Rejected', label:'వద్దన్నారు', cls:'b-rejected'}
+];
+function statusMeta(key){ return STATUS_LIST.find(s=>s.key===key) || {label:key,cls:'b-new'}; }
+
+/* ================== API ================== */
+async function apiList(){
+  const res = await fetch(WEBAPP_URL + '?action=list');
+  const data = await res.json();
+  if(!data.success) throw new Error(data.message||'లోడ్ కాలేదు');
+  return data.data;
+}
+async function apiSend(payload){
+  const res = await fetch(WEBAPP_URL, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if(!data.success) throw new Error(data.message||'సేవ్ కాలేదు');
+  return data;
+}
+
+/* ================== RENDER ================== */
+const app = document.getElementById('app');
+
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function followupTag(dateStr){
+  if(!dateStr) return '';
+  const today = todayStr();
+  if(dateStr < today) return '<div class="followup-tag fu-overdue">⚠ మిస్ అయింది: '+dateStr+'</div>';
+  if(dateStr === today) return '<div class="followup-tag fu-today">📅 ఈరోజు ఫాలో-అప్</div>';
+  return '<div class="followup-tag fu-future">తదుపరి: '+dateStr+'</div>';
+}
+
+function renderStats(){
+  const counts = {};
+  STATUS_LIST.forEach(s=>counts[s.key]=0);
+  customers.forEach(c=>{ if(counts[c.Status]!==undefined) counts[c.Status]++; });
+  const overdue = customers.filter(c=>c.NextFollowupDate && c.NextFollowupDate < todayStr()).length;
+
+  let html = '<div class="stats">';
+  html += statCard('ALL', 'మొత్తం కస్టమర్లు', customers.length);
+  html += statCard('OVERDUE', '⚠ మిస్ అయిన ఫాలో-అప్‌లు', overdue);
+  STATUS_LIST.forEach(s=>{
+    html += statCard(s.key, s.label, counts[s.key]);
+  });
+  html += '</div>';
+  return html;
+}
+function statCard(key,label,num){
+  const active = filterStatus===key ? ' active' : '';
+  return '<div class="stat'+active+'" onclick="setFilter(\''+key+'\')"><div class="num">'+num+'</div><div class="lbl">'+label+'</div></div>';
+}
+
+function renderToolbar(){
+  let opts = '<option value="ALL">అన్ని స్టేజ్‌లు</option>';
+  STATUS_LIST.forEach(s=> opts += '<option value="'+s.key+'"'+(filterStatus===s.key?' selected':'')+'>'+s.label+'</option>');
+  return `<div class="toolbar">
+    <input type="text" id="searchBox" placeholder="పేరు లేదా ఫోన్ నంబర్ వెతకండి..." value="${escapeAttr(searchText)}">
+    <select id="statusFilterSel">${opts}</select>
+  </div>`;
+}
+
+function getFiltered(){
+  return customers.filter(c=>{
+    if(filterStatus==='OVERDUE'){
+      if(!(c.NextFollowupDate && c.NextFollowupDate < todayStr())) return false;
+    } else if(filterStatus!=='ALL' && c.Status!==filterStatus) return false;
+    if(searchText){
+      const t = searchText.toLowerCase();
+      if(!(String(c.Name||'').toLowerCase().includes(t) || String(c.Phone||'').includes(t))) return false;
+    }
+    return true;
+  }).sort((a,b)=>{
+    const da = a.NextFollowupDate || '9999';
+    const db = b.NextFollowupDate || '9999';
+    return da.localeCompare(db);
+  });
+}
+
+function renderTable(){
+  const list = getFiltered();
+  if(list.length===0){
+    return '<div class="card"><div class="empty"><h3>కస్టమర్లు కనబడలేదు</h3><p>కొత్త కస్టమర్‌ని జోడించడానికి పైన "+ కొత్త కస్టమర్" నొక్కండి.</p></div></div>';
+  }
+  let rows = list.map(c=>{
+    const sm = statusMeta(c.Status);
+    return `<tr>
+      <td data-label="పేరు"><div class="name-cell">${escapeHtml(c.Name)}</div><div class="phone-cell">${escapeHtml(c.Category||'')}</div></td>
+      <td data-label="ఫోన్">${escapeHtml(c.Phone)}</td>
+      <td data-label="స్టేజ్"><span class="badge ${sm.cls}">${sm.label}</span></td>
+      <td data-label="ఫాలో-అప్">${followupTag(c.NextFollowupDate)}</td>
+      <td data-label="నోట్స్">${escapeHtml(c.Notes||'')}</td>
+      <td data-label="చర్యలు"><div class="rowActions">
+        <button class="btn-secondary" onclick="openUpdate('${c.ID}')">అప్‌డేట్</button>
+        <button class="btn-danger" onclick="removeCustomer('${c.ID}','${escapeAttr(c.Name)}')">తొలగించు</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  return `<div class="card"><table>
+    <thead><tr><th>పేరు</th><th>ఫోన్</th><th>స్టేజ్</th><th>ఫాలో-అప్</th><th>నోట్స్</th><th>చర్యలు</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+function render(){
+  app.innerHTML = renderStats() + renderToolbar() + renderTable();
+  document.getElementById('searchBox').addEventListener('input', e=>{ searchText = e.target.value; render(); });
+  document.getElementById('statusFilterSel').addEventListener('change', e=>{ filterStatus = e.target.value; render(); });
+}
+function setFilter(key){ filterStatus = key; render(); }
+
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(s){ return escapeHtml(s).replace(/'/g,'&#39;'); }
+
+/* ================== LOAD DATA ================== */
+async function refresh(){
+  app.innerHTML = '<div class="loading">లోడ్ అవుతోంది...</div>';
+  try{
+    customers = await apiList();
+    render();
+  }catch(err){
+    app.innerHTML = '<div class="empty"><h3>డేటా లోడ్ కాలేదు</h3><p>'+escapeHtml(err.message)+'</p><p>సెట్టింగ్స్‌లో Web App URL సరిగ్గా ఉందో చెక్ చేయండి.</p></div>';
+  }
+}
+
+/* ================== ADD / UPDATE MODAL ================== */
+function openAdd(){
+  showModal({
+    title:'కొత్త కస్టమర్ జోడించండి',
+    hint:'కస్టమర్ వివరాలు నింపండి',
+    values:{Status:'New'},
+    onSave: async (vals)=>{
+      await apiSend({action:'add', customer:vals});
+      showToast('కస్టమర్ సేవ్ అయ్యింది ✅');
+      closeModal();
+      refresh();
+    }
+  });
+}
+function openUpdate(id){
+  const c = customers.find(x=>x.ID===id);
+  if(!c) return;
+  showModal({
+    title: c.Name + ' - అప్‌డేట్ చేయండి',
+    hint:'ఈ కస్టమర్‌తో ఏమి జరిగిందో నమోదు చేయండి',
+    values: c,
+    isUpdate:true,
+    onSave: async (vals)=>{
+      vals.ID = id;
+      await apiSend({action:'update', customer:vals});
+      showToast('అప్‌డేట్ సేవ్ అయ్యింది ✅');
+      closeModal();
+      refresh();
+    }
+  });
+}
+async function removeCustomer(id,name){
+  if(!confirm(name + ' ని తొలగించాలా? ఇది వెనక్కి తీసుకోలేం.')) return;
+  try{
+    await apiSend({action:'delete', id:id});
+    showToast('తొలగించబడింది');
+    refresh();
+  }catch(err){ showToast('తప్పు: '+err.message); }
+}
+
+function showModal({title,hint,values,onSave}){
+  let opts = STATUS_LIST.map(s=>`<option value="${s.key}" ${values.Status===s.key?'selected':''}>${s.label}</option>`).join('');
+  const html = `
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h2>${escapeHtml(title)}</h2>
+      <div class="hint">${escapeHtml(hint)}</div>
+      <div class="field"><label>పేరు *</label><input type="text" id="f_name" value="${escapeAttr(values.Name||'')}" placeholder="కస్టమర్ పేరు"></div>
+      <div class="field"><label>ఫోన్ నంబర్ *</label><input type="tel" id="f_phone" value="${escapeAttr(values.Phone||'')}" placeholder="10 అంకెల నంబర్"></div>
+      <div class="field"><label>కేటగిరీ</label><select id="f_category">
+        <option value="Insurance" ${values.Category==='Insurance'?'selected':''}>Insurance</option>
+        <option value="Real Estate" ${values.Category==='Real Estate'?'selected':''}>Real Estate</option>
+        <option value="Mutual Funds" ${values.Category==='Mutual Funds'?'selected':''}>Mutual Funds</option>
+      </select></div>
+      <div class="field"><label>ప్రస్తుత స్టేజ్</label><select id="f_status">${opts}</select></div>
+      <div class="field"><label>అపాయింట్‌మెంట్ తేదీ (ఉంటే)</label><input type="date" id="f_appt" value="${values.AppointmentDate||''}"></div>
+      <div class="field"><label>తదుపరి ఫాలో-అప్ తేదీ</label><input type="date" id="f_next" value="${values.NextFollowupDate||''}"></div>
+      <div class="field"><label>వాళ్ళు ఏమి చెప్పారు / నోట్స్</label><textarea id="f_notes" placeholder="ఉదా: వచ్చే వారం మళ్ళీ కాల్ చేయమన్నారు...">${escapeHtml(values.Notes||'')}</textarea></div>
+      <div class="modalActions">
+        <button class="btn-outline" onclick="closeModal()">రద్దు చేయి</button>
+        <button class="btn-primary" id="saveBtn">సేవ్ చేయి</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('saveBtn').addEventListener('click', async ()=>{
+    const name = document.getElementById('f_name').value.trim();
+    const phone = document.getElementById('f_phone').value.trim();
+    if(!name || !phone){ alert('పేరు మరియు ఫోన్ నంబర్ తప్పనిసరి'); return; }
+    const vals = {
+      Name:name, Phone:phone,
+      Category: document.getElementById('f_category').value,
+      Status: document.getElementById('f_status').value,
+      AppointmentDate: document.getElementById('f_appt').value,
+      NextFollowupDate: document.getElementById('f_next').value,
+      Notes: document.getElementById('f_notes').value.trim()
+    };
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.textContent='సేవ్ అవుతోంది...';
+    try{
+      await onSave(vals);
+    }catch(err){
+      alert('తప్పు: '+err.message);
+      btn.disabled=false; btn.textContent='సేవ్ చేయి';
+    }
+  });
+}
+function closeModal(){
+  const o = document.getElementById('overlay');
+  if(o) o.remove();
+}
+
+/* ================== TOAST ================== */
+let toastTimer;
+function showToast(msg){
+  let t = document.getElementById('toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id='toast'; t.className='toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+/* ================== SETTINGS ================== */
+function openSettings(){
+  const html = `
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h2>⚙️ సెట్టింగ్స్</h2>
+      <div class="hint">Google Apps Script Web App URL ఇక్కడ పేస్ట్ చేయండి</div>
+      <div class="field">
+        <label>Web App URL</label>
+        <input type="text" id="urlInput" value="${escapeAttr(WEBAPP_URL)}" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <div class="modalActions">
+        <button class="btn-outline" onclick="closeModal()">రద్దు చేయి</button>
+        <button class="btn-primary" id="saveUrlBtn">సేవ్ చేసి కనెక్ట్ చేయి</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('saveUrlBtn').addEventListener('click', async ()=>{
+    const url = document.getElementById('urlInput').value.trim();
+    if(!url){ alert('URL పేస్ట్ చేయండి'); return; }
+    await saveConfig(url);
+    closeModal();
+    refresh();
+  });
+}
+
+/* ================== INIT ================== */
+document.getElementById('addBtn').addEventListener('click', openAdd);
+document.getElementById('settingsBtn').addEventListener('click', openSettings);
+
+(async function init(){
+  await loadConfig();
+  if(!WEBAPP_URL){
+    app.innerHTML = `<div class="setupBox">
+      <h2>🔗 మొదటిసారి సెటప్</h2>
+      <p>మీ Google Sheet కి కనెక్ట్ కావడానికి, Apps Script Deploy చేసిన తర్వాత వచ్చే Web App URL ని ఇక్కడ పేస్ట్ చేయండి.</p>
+      <input type="text" id="firstUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+      <button class="btn-primary" id="firstConnectBtn" style="width:100%">కనెక్ట్ చేయి</button>
+    </div>`;
+    document.getElementById('firstConnectBtn').addEventListener('click', async ()=>{
+      const url = document.getElementById('firstUrlInput').value.trim();
+      if(!url){ alert('URL పేస్ట్ చేయండి'); return; }
+      await saveConfig(url);
+      refresh();
+    });
+    return;
+  }
+  refresh();
+})();
+</script>
+</body>
+</html>
