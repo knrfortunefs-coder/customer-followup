@@ -285,6 +285,10 @@ function todayStr(){
   const d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+function normDate(v){
+  if(!v) return '';
+  return String(v).substring(0,10); // strip any leftover time component
+}
 function addDaysStr(baseStr, n){
   const d = new Date(baseStr+'T00:00:00');
   d.setDate(d.getDate()+n);
@@ -295,6 +299,7 @@ function prettyDate(dateStr){
   return d.toLocaleDateString('en-IN', {day:'numeric', month:'short'});
 }
 function followupTag(dateStr){
+  dateStr = normDate(dateStr);
   if(!dateStr) return '';
   const today = todayStr();
   if(dateStr < today) return '<div class="followup-tag fu-overdue">⚠ Missed: '+dateStr+'</div>';
@@ -306,8 +311,10 @@ function eventsForDate(dateStr){
   // Returns customers whose Appointment or NextFollowup falls on dateStr, tagged by type
   const items = [];
   customers.forEach(c=>{
-    if(c.AppointmentDate === dateStr) items.push({c, type:'appt'});
-    if(c.NextFollowupDate === dateStr && c.NextFollowupDate !== c.AppointmentDate) items.push({c, type:'followup'});
+    const appt = normDate(c.AppointmentDate);
+    const next = normDate(c.NextFollowupDate);
+    if(appt === dateStr) items.push({c, type:'appt'});
+    if(next === dateStr && next !== appt) items.push({c, type:'followup'});
   });
   return items;
 }
@@ -350,7 +357,7 @@ function renderStats(){
   const counts = {};
   STATUS_LIST.forEach(s=>counts[s.key]=0);
   customers.forEach(c=>{ if(counts[c.Status]!==undefined) counts[c.Status]++; });
-  const overdue = customers.filter(c=>c.NextFollowupDate && c.NextFollowupDate < todayStr()).length;
+  const overdue = customers.filter(c=>{ const nd=normDate(c.NextFollowupDate); return nd && nd < todayStr(); }).length;
 
   let html = '<div class="stats">';
   html += statCard('ALL', 'Total Customers', customers.length);
@@ -376,7 +383,8 @@ function renderToolbar(){
 function getFiltered(){
   return customers.filter(c=>{
     if(filterStatus==='OVERDUE'){
-      if(!(c.NextFollowupDate && c.NextFollowupDate < todayStr())) return false;
+      const nd = normDate(c.NextFollowupDate);
+      if(!(nd && nd < todayStr())) return false;
     } else if(filterStatus!=='ALL' && c.Status!==filterStatus) return false;
     if(searchText){
       const t = searchText.toLowerCase();
@@ -384,8 +392,8 @@ function getFiltered(){
     }
     return true;
   }).sort((a,b)=>{
-    const da = a.NextFollowupDate || '9999';
-    const db = b.NextFollowupDate || '9999';
+    const da = normDate(a.NextFollowupDate) || '9999';
+    const db = normDate(b.NextFollowupDate) || '9999';
     return da.localeCompare(db);
   });
 }
