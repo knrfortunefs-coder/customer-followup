@@ -49,10 +49,10 @@
     box-sizing:border-box;
     position:relative;
   }
-  .headerLeft{display:flex;align-items:center;gap:12px;min-width:0;padding-left:2px;}
+  .headerLeft{display:flex;align-items:center;gap:14px;min-width:0;padding-left:4px;}
   .headerLeft img{
-    height:46px;width:auto;max-width:120px;border-radius:8px;object-fit:contain;flex-shrink:0;
-    background:#fff;padding:4px;
+    height:50px;width:auto;max-width:170px;border-radius:8px;object-fit:contain;flex-shrink:0;
+    background:#fff;padding:5px 8px;
   }
   .headerTitles{min-width:0;}
   header h1{margin:0;font-size:1.15rem;letter-spacing:.2px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -188,7 +188,7 @@
 
   @media(max-width:640px){
     header{padding:14px 14px;}
-    .headerLeft img{height:36px;max-width:90px;}
+    .headerLeft img{height:38px;max-width:120px;padding:3px 6px;}
     header h1{font-size:1rem;max-width:58vw;}
     header .sub{font-size:.72rem;max-width:58vw;}
     .headerRight button{padding:7px 10px;font-size:.8rem;}
@@ -205,7 +205,7 @@
 
 <header>
   <div class="headerLeft">
-    <img src="https://i.ibb.co/vCZbChdT/9f4ac37b-ee25-4131-ba6b-4ffb9f153208.png" alt="Logo">
+    <img src="https://i.ibb.co/Xx7dkd8J/9d987413-e5bd-41d1-bf83-2b41a5d7b3e2.png" alt="Logo">
     <div class="headerTitles">
       <h1>Customer Follow-up App</h1>
       <div class="sub">Insurance &middot; Real Estate &middot; Mutual Funds</div>
@@ -377,9 +377,10 @@ function renderStats(){
 
   let html = '<div class="stats">';
   html += statCard('ALL', 'Total Customers', customers.length);
+  html += statCard('Appointment Fixed', 'Appointment Fixed', counts['Appointment Fixed']);
   html += statCard('HASFOLLOWUP', '📅 Follow-Ups Scheduled', scheduled);
   html += statCard('OVERDUE', '⚠ Missed Follow-ups', overdue);
-  STATUS_LIST.forEach(s=>{ html += statCard(s.key, s.label, counts[s.key]); });
+  STATUS_LIST.forEach(s=>{ if(s.key!=='Appointment Fixed') html += statCard(s.key, s.label, counts[s.key]); });
   html += '</div>';
   return html;
 }
