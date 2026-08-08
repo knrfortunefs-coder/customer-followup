@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f2038">
+<link rel="icon" type="image/png" href="https://i.ibb.co/vCZbChdT/9f4ac37b-ee25-4131-ba6b-4ffb9f153208.png">
+<link rel="apple-touch-icon" href="https://i.ibb.co/vCZbChdT/9f4ac37b-ee25-4131-ba6b-4ffb9f153208.png">
 <title>Customer Follow-up App</title>
 <style>
   :root{
@@ -23,6 +29,7 @@
     --radius:10px;
   }
   *{box-sizing:border-box;}
+  html,body{overflow-x:hidden;max-width:100%;}
   body{
     margin:0;
     font-family:'Segoe UI',Arial,sans-serif;
@@ -32,16 +39,22 @@
   header{
     background:linear-gradient(135deg,var(--navy-deep),var(--navy));
     color:#fff;
-    padding:22px 20px;
+    padding:16px 20px;
     display:flex;
     align-items:center;
     justify-content:space-between;
     flex-wrap:wrap;
     gap:12px;
   }
-  header h1{margin:0;font-size:1.35rem;letter-spacing:.2px;}
-  header .sub{font-size:.8rem;opacity:.75;margin-top:2px;}
-  .headerRight{display:flex;gap:8px;align-items:center;}
+  .headerLeft{display:flex;align-items:center;gap:12px;min-width:0;}
+  .headerLeft img{
+    width:42px;height:42px;border-radius:10px;object-fit:cover;flex-shrink:0;
+    background:#fff;
+  }
+  .headerTitles{min-width:0;}
+  header h1{margin:0;font-size:1.15rem;letter-spacing:.2px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  header .sub{font-size:.78rem;opacity:.75;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .headerRight{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
   button{
     font-family:inherit;cursor:pointer;border:none;border-radius:8px;
     font-size:.88rem;padding:9px 14px;transition:filter .15s, transform .1s;
@@ -142,14 +155,31 @@
   .pinPad .pinClear{background:var(--clay-light);color:var(--danger);font-size:.8rem;}
   .pinPad .pinBack{background:var(--teal-light);color:var(--teal);font-size:.8rem;}
   .lockError{color:var(--danger);font-size:.82rem;min-height:18px;margin-top:6px;}
+
+  @media(max-width:640px){
+    header{padding:14px 14px;}
+    .headerLeft img{width:36px;height:36px;}
+    header h1{font-size:1rem;max-width:58vw;}
+    header .sub{font-size:.72rem;max-width:58vw;}
+    .headerRight button{padding:7px 10px;font-size:.8rem;}
+    table thead{display:none;}
+    table, tbody, tr, td{display:block;width:100%;}
+    tr{border-bottom:2px solid var(--line);padding:10px 0;}
+    td{border:none;padding:4px 0;display:flex;justify-content:space-between;gap:10px;}
+    td::before{content:attr(data-label);font-weight:600;color:var(--muted);font-size:.72rem;text-transform:uppercase;flex-shrink:0;}
+    .rowActions{justify-content:flex-end;}
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <h1>📋 Customer Follow-up App</h1>
-    <div class="sub">Insurance &middot; Real Estate &middot; Mutual Funds</div>
+  <div class="headerLeft">
+    <img src="https://i.ibb.co/vCZbChdT/9f4ac37b-ee25-4131-ba6b-4ffb9f153208.png" alt="Logo">
+    <div class="headerTitles">
+      <h1>Customer Follow-up App</h1>
+      <div class="sub">Insurance &middot; Real Estate &middot; Mutual Funds</div>
+    </div>
   </div>
   <div class="headerRight">
     <button class="btn-ghost" id="lockNowBtn" title="Lock now">🔒 Lock</button>
