@@ -49,10 +49,10 @@
     box-sizing:border-box;
     position:relative;
   }
-  .headerLeft{display:flex;align-items:center;gap:12px;min-width:0;}
+  .headerLeft{display:flex;align-items:center;gap:12px;min-width:0;padding-left:2px;}
   .headerLeft img{
-    width:42px;height:42px;border-radius:10px;object-fit:cover;flex-shrink:0;
-    background:#fff;
+    height:46px;width:auto;max-width:120px;border-radius:8px;object-fit:contain;flex-shrink:0;
+    background:#fff;padding:4px;
   }
   .headerTitles{min-width:0;}
   header h1{margin:0;font-size:1.15rem;letter-spacing:.2px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -109,7 +109,9 @@
   .b-converted{background:#1f7a4d;color:#fff;}
   .b-rejected{background:#e9e5dd;color:#8a8378;}
 
-  .followup-tag{font-size:.76rem;padding:2px 8px;border-radius:6px;display:inline-block;margin-top:4px;}
+  .followup-tag{font-size:.76rem;padding:5px 9px;border-radius:6px;display:block;margin-top:4px;line-height:1.5;}
+  .followup-tag .tagLabel{display:block;font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.02em;opacity:.85;}
+  .followup-tag .tagDate{display:block;font-size:.85rem;}
   .fu-overdue{background:var(--clay-light);color:var(--danger);font-weight:600;}
   .fu-today{background:#fbf0d9;color:var(--warn);font-weight:600;}
   .fu-future{background:#f1efe8;color:var(--muted);}
@@ -186,7 +188,7 @@
 
   @media(max-width:640px){
     header{padding:14px 14px;}
-    .headerLeft img{width:36px;height:36px;}
+    .headerLeft img{height:36px;max-width:90px;}
     header h1{font-size:1rem;max-width:58vw;}
     header .sub{font-size:.72rem;max-width:58vw;}
     .headerRight button{padding:7px 10px;font-size:.8rem;}
@@ -305,9 +307,9 @@ function followupTag(dateStr){
   dateStr = normDate(dateStr);
   if(!dateStr) return '';
   const today = todayStr();
-  if(dateStr < today) return '<div class="followup-tag fu-overdue">⚠ Missed: '+dateStr+'</div>';
-  if(dateStr === today) return '<div class="followup-tag fu-today">📅 Follow-up Today</div>';
-  return '<div class="followup-tag fu-future">Next: '+dateStr+'</div>';
+  if(dateStr < today) return '<div class="followup-tag fu-overdue"><span class="tagLabel">⚠ Missed Follow-up</span><span class="tagDate">'+dateStr+'</span></div>';
+  if(dateStr === today) return '<div class="followup-tag fu-today"><span class="tagLabel">📅 Follow-up</span><span class="tagDate">Today</span></div>';
+  return '<div class="followup-tag fu-future"><span class="tagLabel">Follow-up</span><span class="tagDate">'+dateStr+'</span></div>';
 }
 function appointmentTag(dateStr){
   dateStr = normDate(dateStr);
@@ -316,7 +318,7 @@ function appointmentTag(dateStr){
   let cls = 'fu-future';
   if(dateStr < today) cls = 'fu-overdue';
   else if(dateStr === today) cls = 'fu-today';
-  return '<div class="followup-tag '+cls+'">📅 Appointment: '+dateStr+'</div>';
+  return '<div class="followup-tag '+cls+'"><span class="tagLabel">📅 Appointment</span><span class="tagDate">'+dateStr+'</span></div>';
 }
 
 function eventsForDate(dateStr){
@@ -369,10 +371,13 @@ function renderStats(){
   const counts = {};
   STATUS_LIST.forEach(s=>counts[s.key]=0);
   customers.forEach(c=>{ if(counts[c.Status]!==undefined) counts[c.Status]++; });
-  const overdue = customers.filter(c=>{ const nd=normDate(c.NextFollowupDate); return nd && nd < todayStr(); }).length;
+  const today = todayStr();
+  const overdue = customers.filter(c=>{ const nd=normDate(c.NextFollowupDate); return nd && nd < today; }).length;
+  const scheduled = customers.filter(c=>{ const nd=normDate(c.NextFollowupDate); return nd && nd >= today; }).length;
 
   let html = '<div class="stats">';
   html += statCard('ALL', 'Total Customers', customers.length);
+  html += statCard('HASFOLLOWUP', '📅 Follow-Ups Scheduled', scheduled);
   html += statCard('OVERDUE', '⚠ Missed Follow-ups', overdue);
   STATUS_LIST.forEach(s=>{ html += statCard(s.key, s.label, counts[s.key]); });
   html += '</div>';
@@ -397,6 +402,9 @@ function getFiltered(){
     if(filterStatus==='OVERDUE'){
       const nd = normDate(c.NextFollowupDate);
       if(!(nd && nd < todayStr())) return false;
+    } else if(filterStatus==='HASFOLLOWUP'){
+      const nd = normDate(c.NextFollowupDate);
+      if(!(nd && nd >= todayStr())) return false;
     } else if(filterStatus!=='ALL' && c.Status!==filterStatus) return false;
     if(searchText){
       const t = searchText.toLowerCase();
