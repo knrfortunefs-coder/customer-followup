@@ -156,6 +156,31 @@
   .pinPad .pinBack{background:var(--teal-light);color:var(--teal);font-size:.8rem;}
   .lockError{color:var(--danger);font-size:.82rem;min-height:18px;margin-top:6px;}
 
+  /* Today & Upcoming panel */
+  .upcomingWrap{margin-bottom:20px;}
+  .upcomingTitle{font-size:.95rem;font-weight:700;color:var(--navy);margin-bottom:10px;}
+  .upcomingGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;}
+  .upcomingCol{border-radius:var(--radius);padding:12px;border:1px solid var(--line);background:#fff;}
+  .upcomingCol.today{border-color:#e8b3a4;background:linear-gradient(180deg,#fff,var(--clay-light) 400%);}
+  .upcomingCol.tomorrow{border-color:#e9d3a0;background:linear-gradient(180deg,#fff,#fbf0d9 400%);}
+  .upcomingCol.dayafter{border-color:#a9c7e0;background:linear-gradient(180deg,#fff,#e7f0f9 400%);}
+  .upcomingColHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .upcomingColHead .dlabel{font-weight:700;font-size:.86rem;}
+  .today .dlabel{color:var(--danger);}
+  .tomorrow .dlabel{color:var(--warn);}
+  .dayafter .dlabel{color:#2b5c8f;}
+  .upcomingColHead .ddate{font-size:.72rem;color:var(--muted);}
+  .upcomingCount{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(0,0,0,.06);}
+  .upcomingItem{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:7px;cursor:pointer;}
+  .upcomingItem:hover{box-shadow:0 2px 8px rgba(0,0,0,.06);}
+  .upcomingItem:last-child{margin-bottom:0;}
+  .upcomingItem .uName{font-weight:600;color:var(--navy);font-size:.85rem;}
+  .upcomingItem .uPhone{font-size:.75rem;color:var(--muted);}
+  .upcomingTag{display:inline-block;font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:20px;margin-top:3px;}
+  .tag-appt{background:var(--teal-light);color:var(--teal);}
+  .tag-followup{background:#eee9dc;color:var(--muted);}
+  .upcomingEmpty{font-size:.78rem;color:var(--muted);padding:6px 2px;}
+
   @media(max-width:640px){
     header{padding:14px 14px;}
     .headerLeft img{width:36px;height:36px;}
@@ -260,12 +285,65 @@ function todayStr(){
   const d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+function addDaysStr(baseStr, n){
+  const d = new Date(baseStr+'T00:00:00');
+  d.setDate(d.getDate()+n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function prettyDate(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  return d.toLocaleDateString('en-IN', {day:'numeric', month:'short'});
+}
 function followupTag(dateStr){
   if(!dateStr) return '';
   const today = todayStr();
   if(dateStr < today) return '<div class="followup-tag fu-overdue">⚠ Missed: '+dateStr+'</div>';
   if(dateStr === today) return '<div class="followup-tag fu-today">📅 Follow-up Today</div>';
   return '<div class="followup-tag fu-future">Next: '+dateStr+'</div>';
+}
+
+function eventsForDate(dateStr){
+  // Returns customers whose Appointment or NextFollowup falls on dateStr, tagged by type
+  const items = [];
+  customers.forEach(c=>{
+    if(c.AppointmentDate === dateStr) items.push({c, type:'appt'});
+    if(c.NextFollowupDate === dateStr && c.NextFollowupDate !== c.AppointmentDate) items.push({c, type:'followup'});
+  });
+  return items;
+}
+
+function renderUpcoming(){
+  const d0 = todayStr();
+  const d1 = addDaysStr(d0,1);
+  const d2 = addDaysStr(d0,2);
+  const cols = [
+    {cls:'today', label:'Today', date:d0},
+    {cls:'tomorrow', label:'Tomorrow', date:d1},
+    {cls:'dayafter', label:'Day After Tomorrow', date:d2}
+  ];
+  let html = '<div class="upcomingWrap"><div class="upcomingTitle">📅 Today &amp; Upcoming (Next 3 Days)</div><div class="upcomingGrid">';
+  cols.forEach(col=>{
+    const items = eventsForDate(col.date);
+    html += `<div class="upcomingCol ${col.cls}">
+      <div class="upcomingColHead">
+        <div><div class="dlabel">${col.label}</div><div class="ddate">${prettyDate(col.date)}</div></div>
+        <div class="upcomingCount">${items.length}</div>
+      </div>`;
+    if(items.length===0){
+      html += '<div class="upcomingEmpty">Nothing scheduled</div>';
+    } else {
+      items.forEach(({c,type})=>{
+        html += `<div class="upcomingItem" onclick="openUpdate('${c.ID}')">
+          <div class="uName">${escapeHtml(c.Name)}</div>
+          <div class="uPhone">${escapeHtml(c.Phone)}</div>
+          <span class="upcomingTag ${type==='appt'?'tag-appt':'tag-followup'}">${type==='appt'?'Appointment':'Follow-up'}</span>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+  html += '</div></div>';
+  return html;
 }
 
 function renderStats(){
@@ -349,7 +427,7 @@ function renderTable(){
 }
 
 function render(){
-  app.innerHTML = renderStats() + renderToolbar() + renderTable();
+  app.innerHTML = renderUpcoming() + renderStats() + renderToolbar() + renderTable();
   document.getElementById('searchBox').addEventListener('input', e=>{ searchText = e.target.value; render(); });
   document.getElementById('statusFilterSel').addEventListener('change', e=>{ filterStatus = e.target.value; render(); });
 }
