@@ -45,6 +45,9 @@
     justify-content:space-between;
     flex-wrap:wrap;
     gap:12px;
+    width:100%;
+    box-sizing:border-box;
+    position:relative;
   }
   .headerLeft{display:flex;align-items:center;gap:12px;min-width:0;}
   .headerLeft img{
@@ -87,7 +90,7 @@
   .toolbar input[type=text]{flex:1;min-width:180px;}
   .toolbar select{min-width:150px;}
 
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow-x:auto;}
   table{width:100%;border-collapse:collapse;font-size:.87rem;}
   th{text-align:left;background:#f1efe8;color:var(--muted);font-weight:600;padding:10px 12px;font-size:.76rem;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--line);}
   td{padding:11px 12px;border-bottom:1px solid #efece3;vertical-align:top;}
@@ -306,6 +309,15 @@ function followupTag(dateStr){
   if(dateStr === today) return '<div class="followup-tag fu-today">📅 Follow-up Today</div>';
   return '<div class="followup-tag fu-future">Next: '+dateStr+'</div>';
 }
+function appointmentTag(dateStr){
+  dateStr = normDate(dateStr);
+  if(!dateStr) return '';
+  const today = todayStr();
+  let cls = 'fu-future';
+  if(dateStr < today) cls = 'fu-overdue';
+  else if(dateStr === today) cls = 'fu-today';
+  return '<div class="followup-tag '+cls+'">📅 Appointment: '+dateStr+'</div>';
+}
 
 function eventsForDate(dateStr){
   // Returns customers whose Appointment or NextFollowup falls on dateStr, tagged by type
@@ -420,7 +432,7 @@ function renderTable(){
       <td data-label="Name"><div class="name-cell">${escapeHtml(c.Name)}</div><div class="phone-cell">${escapeHtml(c.Category||'')}</div>${svc?'<div class="sub-cell">'+escapeHtml(svc)+'</div>':''}</td>
       <td data-label="Phone">${escapeHtml(c.Phone)}</td>
       <td data-label="Stage"><span class="badge ${sm.cls}">${sm.label}</span></td>
-      <td data-label="Follow-up">${followupTag(c.NextFollowupDate)}</td>
+      <td data-label="Follow-up">${appointmentTag(c.AppointmentDate)}${followupTag(c.NextFollowupDate)}</td>
       <td data-label="Notes">${escapeHtml(c.Notes||'')}</td>
       <td data-label="Actions"><div class="rowActions">
         <button class="btn-secondary" onclick="openUpdate('${c.ID}')">Update</button>
@@ -605,29 +617,39 @@ function openSettings(){
   <div class="overlay" id="overlay">
     <div class="modal">
       <h2>⚙️ Settings</h2>
-      <div class="hint">Google Apps Script Web App URL</div>
+      <div class="hint">Manage app security</div>
       <div class="field">
-        <label>Web App URL</label>
-        <input type="text" id="urlInput" value="${escapeAttr(WEBAPP_URL)}" placeholder="https://script.google.com/macros/s/.../exec">
+        <button class="btn-secondary" id="changePinBtn" style="width:100%">Change PIN</button>
+      </div>
+      <div id="advancedWrap">
+        <button class="btn-link" id="showAdvancedBtn">Advanced</button>
       </div>
       <div class="modalActions">
-        <button class="btn-outline" onclick="closeModal()">Cancel</button>
-        <button class="btn-secondary" id="changePinBtn">Change PIN</button>
-        <button class="btn-primary" id="saveUrlBtn">Save &amp; Connect</button>
+        <button class="btn-outline" onclick="closeModal()">Close</button>
       </div>
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
-  document.getElementById('saveUrlBtn').addEventListener('click', ()=>{
-    const url = document.getElementById('urlInput').value.trim();
-    if(!url){ alert('Please paste a URL'); return; }
-    saveConfig(url);
-    closeModal();
-    refresh();
-  });
   document.getElementById('changePinBtn').addEventListener('click', ()=>{
     closeModal();
     startPinSetupFlow(true);
+  });
+  document.getElementById('showAdvancedBtn').addEventListener('click', ()=>{
+    document.getElementById('advancedWrap').innerHTML = `
+      <div class="hint" style="margin-top:10px;">Connection URL (only change this if your Apps Script deployment link changes — normally you never need to touch this)</div>
+      <div class="field">
+        <label>Web App URL</label>
+        <input type="text" id="urlInput" value="${escapeAttr(WEBAPP_URL)}" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <button class="btn-primary" id="saveUrlBtn" style="width:100%">Save &amp; Connect</button>
+    `;
+    document.getElementById('saveUrlBtn').addEventListener('click', ()=>{
+      const url = document.getElementById('urlInput').value.trim();
+      if(!url){ alert('Please paste a URL'); return; }
+      saveConfig(url);
+      closeModal();
+      refresh();
+    });
   });
 }
 document.getElementById('addBtn').addEventListener('click', openAdd);
