@@ -674,7 +674,7 @@ function loadCurrentView(){
 let meetings = [];
 let meetingFilterType = 'ALL';
 const MEETING_PLATFORMS = ['Google Meet','Zoom','Google Teams','Other'];
-const MEETING_COMPANIES = ['LIC','Care Health','Axis Max Life','CSC','Other'];
+const MEETING_COMPANIES = ['LIC','Care Health','Axis Max Life','NSP','NJ Wealth','CSC','Other'];
 
 async function refreshMeetings(){
   app.innerHTML = '<div class="loading">Loading...</div>';
@@ -705,14 +705,14 @@ function meetingUpcomingPanel(){
   ];
   let html = '<div class="upcomingWrap"><div class="upcomingTitle">📅 Meetings - Today &amp; Upcoming (Next 3 Days)</div><div class="upcomingGrid">';
   cols.forEach(col=>{
-    const items = meetings.filter(m=> dtDate(m.DateTime)===col.date);
+    const items = meetings.filter(m=> dtDate(m.StartDateTime)===col.date);
     html += `<div class="upcomingCol ${col.cls}"><div class="upcomingColHead"><div><div class="dlabel">${col.label}</div><div class="ddate">${prettyDate(col.date)}</div></div><div class="upcomingCount">${items.length}</div></div>`;
     if(items.length===0){ html += '<div class="upcomingEmpty">Nothing scheduled</div>'; }
     else {
       items.forEach(m=>{
         html += `<div class="upcomingItem" onclick="openUpdateMeeting('${m.ID}')">
           <div class="uName">${escapeHtml(m.MeetingWith)}</div>
-          <div class="uPhone">${escapeHtml(m.Company||'')}</div>
+          <div class="uPhone">${escapeHtml(m.Company||'')}${m.Type==='Offline'&&m.Location?' · '+escapeHtml(m.Location):''}</div>
           <span class="upcomingTag ${m.Type==='Online'?'tag-appt':'tag-followup'}">${m.Type==='Online'?('Online · '+escapeHtml(m.Platform||'')):'Offline'}</span>
         </div>`;
       });
@@ -726,7 +726,7 @@ function meetingUpcomingPanel(){
 function renderMeetingsStats(){
   const today = todayStr();
   const total = meetings.length;
-  const todayCount = meetings.filter(m=>dtDate(m.DateTime)===today).length;
+  const todayCount = meetings.filter(m=>dtDate(m.StartDateTime)===today).length;
   const online = meetings.filter(m=>m.Type==='Online').length;
   const offline = meetings.filter(m=>m.Type==='Offline').length;
   let html = '<div class="stats">';
@@ -745,10 +745,65 @@ function setMeetingFilter(key){ meetingFilterType = key; renderMeetingsView(); }
 
 function getFilteredMeetings(){
   return meetings.filter(m=>{
-    if(meetingFilterType==='TODAY') return dtDate(m.DateTime)===todayStr();
+    if(meetingFilterType==='TODAY') return dtDate(m.StartDateTime)===todayStr();
     if(meetingFilterType==='Online'||meetingFilterType==='Offline') return m.Type===meetingFilterType;
     return true;
-  }).sort((a,b)=> String(a.DateTime||'9999').localeCompare(String(b.DateTime||'9999')));
+  }).sort((a,b)=> String(a.StartDateTime||'9999').localeCompare(String(b.StartDateTime||'9999')));
+}
+
+// Formats a start/end datetime-local pair into a readable range, e.g.
+// "10 Aug 2026, 1:00 PM – 3:00 PM" or, if different days, both full dates.
+function dtRangePretty(startV, endV){
+  if(!startV) return '';
+  const [sDate, sTime] = String(startV).split('T');
+  if(!sTime) return startV;
+  const d = new Date(sDate+'T00:00:00');
+  const dateLabel = d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  const fmtTime = (t)=>{
+    if(!t) return '';
+    let [h,mi] = t.split(':').map(Number);
+    const ap = h>=12 ? 'PM' : 'AM';
+    h = h%12; if(h===0) h=12;
+    return h+':'+String(mi).padStart(2,'0')+' '+ap;
+  };
+  if(!endV) return dateLabel+', '+fmtTime(sTime);
+  const [eDate, eTime] = String(endV).split('T');
+  if(eDate===sDate){
+    return dateLabel+', '+fmtTime(sTime)+' – '+fmtTime(eTime);
+  }
+  const d2 = new Date(eDate+'T00:00:00');
+  const dateLabel2 = d2.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  return dateLabel+' '+fmtTime(sTime)+' – '+dateLabel2+' '+fmtTime(eTime);
+}
+
+// Builds a Google Calendar "quick add event" link so the user gets Google's
+// own reminder/notification before the meeting or task time.
+function gcalLink(title, startV, endV, details, location){
+  const toGcal = (v)=>{
+    if(!v) return '';
+    const [d,t] = String(v).split('T');
+    if(!d) return '';
+    const dd = d.replace(/-/g,'');
+    const tt = t ? t.replace(':','')+'00' : '000000';
+    return dd+'T'+tt;
+  };
+  let s = toGcal(startV);
+  let e = toGcal(endV);
+  if(!e && s){
+    // default 30-minute event if no end time given
+    const [d,t] = String(startV).split('T');
+    const dt = new Date(d+'T'+(t||'09:00')+':00');
+    dt.setMinutes(dt.getMinutes()+30);
+    e = dt.getFullYear()+String(dt.getMonth()+1).padStart(2,'0')+String(dt.getDate()).padStart(2,'0')+'T'+String(dt.getHours()).padStart(2,'0')+String(dt.getMinutes()).padStart(2,'0')+'00';
+  }
+  const params = new URLSearchParams({
+    action:'TEMPLATE',
+    text: title || '',
+    details: details || '',
+    location: location || ''
+  });
+  if(s && e) params.set('dates', s+'/'+e);
+  return 'https://calendar.google.com/calendar/render?'+params.toString();
 }
 
 function renderMeetingsTable(){
@@ -757,12 +812,13 @@ function renderMeetingsTable(){
     return '<div class="card"><div class="empty"><h3>No meetings found</h3><p>Click "+ New Meeting" above to add one.</p></div></div>';
   }
   let rows = list.map(m=>{
-    const joinBtn = (m.Type==='Online' && m.MeetingLink) ? `<a href="${escapeAttr(m.MeetingLink)}" target="_blank" rel="noopener" class="btn-secondary" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">Join</a>` : '';
+    const joinBtn = (m.Type==='Online' && m.MeetingLink) ? `<a href="${escapeAttr(m.MeetingLink)}" target="_blank" rel="noopener" class="btn-secondary" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;margin-bottom:4px;">Join</a>` : '';
+    const remindLink = m.StartDateTime ? `<a href="${escapeAttr(gcalLink(m.MeetingWith+' ('+(m.Company||'Meeting')+')', m.StartDateTime, m.EndDateTime, m.Remarks||'', m.Type==='Offline'?(m.Location||''):(m.MeetingLink||'')))}" target="_blank" rel="noopener" class="btn-outline" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">🔔 Remind Me</a>` : '';
     return `<tr>
-      <td data-label="Meeting With"><div class="name-cell">${escapeHtml(m.MeetingWith)}</div><div class="sub-cell">${escapeHtml(m.Company||'')}</div></td>
+      <td data-label="Meeting With"><div class="name-cell">${escapeHtml(m.MeetingWith)}</div><div class="sub-cell">${escapeHtml(m.Company||'')}</div>${m.Type==='Offline'&&m.Location?'<div class="sub-cell">📍 '+escapeHtml(m.Location)+'</div>':''}</td>
       <td data-label="Type"><span class="badge ${m.Type==='Online'?'b-appt':'b-postponed'}">${escapeHtml(m.Type||'')}</span>${m.Type==='Online'?'<div class="sub-cell">'+escapeHtml(m.Platform||'')+'</div>':''}</td>
-      <td data-label="Date & Time">${escapeHtml(dtPretty(m.DateTime))}</td>
-      <td data-label="Link">${joinBtn}</td>
+      <td data-label="Date & Time">${escapeHtml(dtRangePretty(m.StartDateTime, m.EndDateTime))}</td>
+      <td data-label="Link">${joinBtn}${remindLink}</td>
       <td data-label="Remarks">${escapeHtml(m.Remarks||'')}</td>
       <td data-label="Actions"><div class="rowActions">
         <button class="btn-secondary" onclick="openUpdateMeeting('${m.ID}')">Update</button>
@@ -786,20 +842,24 @@ function meetingFieldsHtml(values){
     <option value="Online" ${type==='Online'?'selected':''}>Online</option>
     <option value="Offline" ${type==='Offline'?'selected':''}>Offline</option>
   </select></div>`;
-  html += `<div id="meetingOnlineWrap">${type==='Online'?meetingOnlineFieldsHtml(values):''}</div>`;
+  html += `<div id="meetingTypeWrap">${meetingTypeFieldsHtml(values)}</div>`;
   return html;
 }
-function meetingOnlineFieldsHtml(values){
-  const platform = values.Platform || MEETING_PLATFORMS[0];
-  let html = `<div class="field"><label>Platform</label><select id="mf_platform">`
-    + MEETING_PLATFORMS.map(p=>`<option value="${p}" ${platform===p?'selected':''}>${p}</option>`).join('')
-    + `</select></div>`;
-  html += `<div class="field"><label>Meeting Link</label><input type="text" id="mf_link" value="${escapeAttr(values.MeetingLink||'')}" placeholder="https://meet.google.com/..."></div>`;
-  return html;
+function meetingTypeFieldsHtml(values){
+  const type = values.Type || 'Online';
+  if(type==='Online'){
+    const platform = values.Platform || MEETING_PLATFORMS[0];
+    let html = `<div class="field"><label>Platform</label><select id="mf_platform">`
+      + MEETING_PLATFORMS.map(p=>`<option value="${p}" ${platform===p?'selected':''}>${p}</option>`).join('')
+      + `</select></div>`;
+    html += `<div class="field"><label>Meeting Link</label><input type="text" id="mf_link" value="${escapeAttr(values.MeetingLink||'')}" placeholder="https://meet.google.com/..."></div>`;
+    return html;
+  }
+  return `<div class="field"><label>Meeting Location</label><input type="text" id="mf_location" value="${escapeAttr(values.Location||'')}" placeholder="Office address / place name"></div>`;
 }
 function onMeetingTypeChange(){
   const type = document.getElementById('mf_type').value;
-  document.getElementById('meetingOnlineWrap').innerHTML = type==='Online' ? meetingOnlineFieldsHtml({}) : '';
+  document.getElementById('meetingTypeWrap').innerHTML = meetingTypeFieldsHtml({Type:type});
 }
 function meetingCompanyFieldHtml(values){
   const isOther = values.Company && MEETING_COMPANIES.indexOf(values.Company)===-1;
@@ -823,7 +883,8 @@ function showMeetingModal({title,hint,values,onSave}){
       <div class="field"><label>Meeting With *</label><input type="text" id="mf_with" value="${escapeAttr(values.MeetingWith||'')}" placeholder="Person / purpose"></div>
       ${meetingFieldsHtml(values)}
       ${meetingCompanyFieldHtml(values)}
-      <div class="field"><label>Date &amp; Time</label><input type="datetime-local" id="mf_datetime" value="${values.DateTime||''}"></div>
+      <div class="field"><label>Start Date &amp; Time *</label><input type="datetime-local" id="mf_start" value="${values.StartDateTime||''}"></div>
+      <div class="field"><label>End Date &amp; Time</label><input type="datetime-local" id="mf_end" value="${values.EndDateTime||''}"></div>
       <div class="field"><label>Remarks</label><textarea id="mf_remarks" placeholder="Notes about this meeting...">${escapeHtml(values.Remarks||'')}</textarea></div>
       <div class="modalActions">
         <button class="btn-outline" onclick="closeModal()">Cancel</button>
@@ -835,6 +896,8 @@ function showMeetingModal({title,hint,values,onSave}){
   document.getElementById('saveMeetingBtn').addEventListener('click', async ()=>{
     const withWhom = document.getElementById('mf_with').value.trim();
     if(!withWhom){ alert('Please enter who the meeting is with'); return; }
+    const start = document.getElementById('mf_start').value;
+    if(!start){ alert('Please choose a start date & time'); return; }
     const type = document.getElementById('mf_type').value;
     const companySel = document.getElementById('mf_company').value;
     const companyOther = document.getElementById('mf_companyOther');
@@ -843,8 +906,10 @@ function showMeetingModal({title,hint,values,onSave}){
       Type: type,
       Platform: type==='Online' ? (document.getElementById('mf_platform')?document.getElementById('mf_platform').value:'') : '',
       MeetingLink: type==='Online' ? (document.getElementById('mf_link')?document.getElementById('mf_link').value.trim():'') : '',
+      Location: type==='Offline' ? (document.getElementById('mf_location')?document.getElementById('mf_location').value.trim():'') : '',
       Company: companySel==='Other' ? (companyOther?companyOther.value.trim():'') : companySel,
-      DateTime: document.getElementById('mf_datetime').value,
+      StartDateTime: start,
+      EndDateTime: document.getElementById('mf_end').value,
       Remarks: document.getElementById('mf_remarks').value.trim()
     };
     const btn = document.getElementById('saveMeetingBtn');
@@ -936,11 +1001,13 @@ function renderTodosTable(){
   }
   let rows = list.map(t=>{
     const done = t.Status==='Completed';
+    const remindLink = t.DateTime ? `<a href="${escapeAttr(gcalLink(t.NameOfWork, t.DateTime, '', (t.Purpose?t.Purpose+' — ':'')+(t.Remarks||''), ''))}" target="_blank" rel="noopener" class="btn-outline" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">🔔 Remind Me</a>` : '';
     return `<tr>
       <td data-label="Work">${escapeHtml(t.NameOfWork)}</td>
       <td data-label="Purpose">${escapeHtml(t.Purpose||'')}</td>
       <td data-label="Date & Time">${escapeHtml(dtPretty(t.DateTime))}</td>
       <td data-label="Status"><span class="badge ${done?'b-converted':'b-postponed'}">${done?'Completed ✅':'Pending'}</span></td>
+      <td data-label="Reminder">${remindLink}</td>
       <td data-label="Remarks">${escapeHtml(t.Remarks||'')}</td>
       <td data-label="Actions"><div class="rowActions">
         <button class="btn-secondary" onclick="toggleTodoStatus('${t.ID}')">${done?'Mark Pending':'Mark Done'}</button>
@@ -950,7 +1017,7 @@ function renderTodosTable(){
     </tr>`;
   }).join('');
   return `<div class="card"><table>
-    <thead><tr><th>Work</th><th>Purpose</th><th>Date &amp; Time</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Work</th><th>Purpose</th><th>Date &amp; Time</th><th>Status</th><th>Reminder</th><th>Remarks</th><th>Actions</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
