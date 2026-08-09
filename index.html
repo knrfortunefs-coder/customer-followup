@@ -75,12 +75,19 @@
   .btn-link{background:none;color:var(--teal);padding:4px 0;text-decoration:underline;font-size:.82rem;}
   main{max-width:1100px;margin:0 auto;padding:20px;}
 
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px;}
-  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;cursor:pointer;transition:box-shadow .15s, border-color .15s;}
-  .stat:hover{box-shadow:0 3px 10px rgba(28,53,87,.08);border-color:#c9c1ae;}
-  .stat.active{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-light);}
+  /* Tab bar */
+  .tabs{display:flex;gap:6px;background:var(--navy-deep);padding:0 20px;overflow-x:auto;}
+  .tabBtn{background:none;color:rgba(255,255,255,.65);border-radius:0;padding:12px 16px;font-weight:600;font-size:.88rem;border-bottom:3px solid transparent;white-space:nowrap;}
+  .tabBtn:hover{color:#fff;}
+  .tabBtn.active{color:#fff;border-bottom-color:var(--clay);}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--sc,var(--line));border-radius:var(--radius);padding:12px 14px;cursor:pointer;transition:box-shadow .15s, border-color .15s;}
+  .stat:hover{box-shadow:0 3px 10px rgba(28,53,87,.08);}
+  .stat.active{box-shadow:0 0 0 2px var(--sc,var(--teal-light));}
   .stat .num{font-size:1.5rem;font-weight:700;color:var(--navy);}
   .stat .lbl{font-size:.74rem;color:var(--muted);margin-top:2px;}
+  .stat .icon{font-size:1.1rem;margin-bottom:2px;display:block;}
 
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
   input[type=text],input[type=tel],input[type=date],input[type=password],select,textarea{
@@ -181,6 +188,7 @@
   .upcomingItem:last-child{margin-bottom:0;}
   .upcomingItem .uName{font-weight:600;color:var(--navy);font-size:.85rem;}
   .upcomingItem .uPhone{font-size:.75rem;color:var(--muted);}
+  .upcomingItem .uService{font-size:.72rem;color:var(--teal);font-weight:600;margin-top:2px;}
   .upcomingTag{display:inline-block;font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:20px;margin-top:3px;}
   .tag-appt{background:var(--teal-light);color:var(--teal);}
   .tag-followup{background:#eee9dc;color:var(--muted);}
@@ -211,10 +219,8 @@
   <div class="headerLeft">
     <img src="https://i.ibb.co/JR02x8bX/58f4ee4b-a9fc-4eaf-a9dc-6ed53f599021.png" alt="Logo">
     <div class="headerTitles">
-      <center>
       <h1>KNR Fortune Financial Services</h1>
       <div class="sub">Customers Follow-up CRM</div>
-      </center>
     </div>
   </div>
   <div class="headerRight">
@@ -223,6 +229,12 @@
     <button class="btn-primary" id="addBtn">+ New Customer</button>
   </div>
 </header>
+
+<nav class="tabs" id="tabBar">
+  <button class="tabBtn active" data-view="customers" onclick="switchView('customers')">👥 Customers</button>
+  <button class="tabBtn" data-view="meetings" onclick="switchView('meetings')">🤝 Meetings</button>
+  <button class="tabBtn" data-view="todos" onclick="switchView('todos')">✅ To-Do List</button>
+</nav>
 
 <main id="app">
   <div class="loading">Loading...</div>
@@ -272,8 +284,8 @@ const INSURANCE_COMPANIES = {
 const REALESTATE_TYPES = ['Red Sandal Farm Lands','Open Plots','Apartments','Other'];
 
 /* ================== API ================== */
-async function apiList(){
-  const res = await fetch(WEBAPP_URL + '?action=list');
+async function apiList(entity){
+  const res = await fetch(WEBAPP_URL + '?action=list&entity=' + entity);
   const data = await res.json();
   if(!data.success) throw new Error(data.message||'Could not load data');
   return data.data;
@@ -288,6 +300,9 @@ async function apiSend(payload){
   if(!data.success) throw new Error(data.message||'Could not save');
   return data;
 }
+async function apiAdd(entity, record){ return apiSend({action:'add', entity, record}); }
+async function apiUpdate(entity, record){ return apiSend({action:'update', entity, record}); }
+async function apiDelete(entity, id){ return apiSend({action:'delete', entity, id}); }
 
 /* ================== RENDER ================== */
 const app = document.getElementById('app');
@@ -360,9 +375,11 @@ function renderUpcoming(){
       html += '<div class="upcomingEmpty">Nothing scheduled</div>';
     } else {
       items.forEach(({c,type})=>{
+        const svc = serviceSummary(c);
         html += `<div class="upcomingItem" onclick="openUpdate('${c.ID}')">
           <div class="uName">${escapeHtml(c.Name)}</div>
           <div class="uPhone">${escapeHtml(c.Phone)}</div>
+          ${svc?'<div class="uService">'+escapeHtml(svc)+'</div>':(c.Category?'<div class="uService">'+escapeHtml(c.Category)+'</div>':'')}
           <span class="upcomingTag ${type==='appt'?'tag-appt':'tag-followup'}">${type==='appt'?'Appointment':'Follow-up'}</span>
         </div>`;
       });
@@ -382,17 +399,24 @@ function renderStats(){
   const scheduled = customers.filter(c=>{ const nd=normDate(c.NextFollowupDate); return nd && nd >= today; }).length;
 
   let html = '<div class="stats">';
-  html += statCard('ALL', 'Total Customers', customers.length);
-  html += statCard('Appointment Fixed', 'Appointment Fixed', counts['Appointment Fixed']);
-  html += statCard('HASFOLLOWUP', '📅 Follow-Ups Scheduled', scheduled);
-  html += statCard('OVERDUE', '⚠ Missed Follow-ups', overdue);
-  STATUS_LIST.forEach(s=>{ if(s.key!=='Appointment Fixed') html += statCard(s.key, s.label, counts[s.key]); });
+  html += statCard('ALL', 'Total Customers', customers.length, '👥', '#2b5c8f');
+  html += statCard('Appointment Fixed', 'Appointment Fixed', counts['Appointment Fixed'], '📌', '#0f7a6b');
+  html += statCard('HASFOLLOWUP', 'Follow-Ups Scheduled', scheduled, '📅', '#b8862d');
+  html += statCard('OVERDUE', 'Missed Follow-ups', overdue, '⚠️', '#b3402f');
+  html += statCard('New', 'New', counts['New'], '✨', '#5b6fd6');
+  html += statCard('Postponed', 'Postponed', counts['Postponed'], '⏳', '#c98a2c');
+  html += statCard('Met - Interested', 'Met - Interested', counts['Met - Interested'], '🙂', '#1f7a4d');
+  html += statCard('Met - Not Interested', 'Met - Not Interested', counts['Met - Not Interested'], '😐', '#a15c3e');
+  html += statCard('Not Reachable', 'Not Reachable', counts['Not Reachable'], '📵', '#c9622f');
+  html += statCard('Converted', 'Converted', counts['Converted'], '✅', '#1f7a4d');
+  html += statCard('Rejected', 'Rejected', counts['Rejected'], '❌', '#8a8378');
   html += '</div>';
   return html;
 }
-function statCard(key,label,num){
+function statCard(key,label,num,icon,color){
   const active = filterStatus===key ? ' active' : '';
-  return '<div class="stat'+active+'" onclick="setFilter(\''+key+'\')"><div class="num">'+num+'</div><div class="lbl">'+label+'</div></div>';
+  const style = color ? ' style="--sc:'+color+'"' : '';
+  return '<div class="stat'+active+'"'+style+' onclick="setFilter(\''+key+'\')">'+(icon?'<span class="icon">'+icon+'</span>':'')+'<div class="num">'+num+'</div><div class="lbl">'+label+'</div></div>';
 }
 
 function renderToolbar(){
@@ -474,10 +498,10 @@ function escapeHtml(s){
 function escapeAttr(s){ return escapeHtml(s).replace(/'/g,'&#39;'); }
 
 /* ================== LOAD DATA ================== */
-async function refresh(){
+async function refreshCustomers(){
   app.innerHTML = '<div class="loading">Loading...</div>';
   try{
-    customers = await apiList();
+    customers = await apiList('customers');
     render();
   }catch(err){
     app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
@@ -524,10 +548,10 @@ function openAdd(){
     hint:'Fill in the customer details',
     values:{Status:'New', Category:'Insurance'},
     onSave: async (vals)=>{
-      await apiSend({action:'add', customer:vals});
+      await apiAdd('customers', vals);
       showToast('Customer saved ✅');
       closeModal();
-      refresh();
+      refreshCustomers();
     }
   });
 }
@@ -541,19 +565,19 @@ function openUpdate(id){
     isUpdate:true,
     onSave: async (vals)=>{
       vals.ID = id;
-      await apiSend({action:'update', customer:vals});
+      await apiUpdate('customers', vals);
       showToast('Update saved ✅');
       closeModal();
-      refresh();
+      refreshCustomers();
     }
   });
 }
 async function removeCustomer(id,name){
   if(!confirm('Delete '+name+'? This cannot be undone.')) return;
   try{
-    await apiSend({action:'delete', id:id});
+    await apiDelete('customers', id);
     showToast('Deleted');
-    refresh();
+    refreshCustomers();
   }catch(err){ showToast('Error: '+err.message); }
 }
 
@@ -626,6 +650,392 @@ function showToast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2500);
 }
 
+/* ================== VIEW SWITCHING ================== */
+let currentView = 'customers';
+function switchView(view){
+  currentView = view;
+  document.querySelectorAll('.tabBtn').forEach(b=> b.classList.toggle('active', b.dataset.view===view));
+  updateAddButton();
+  loadCurrentView();
+}
+function updateAddButton(){
+  const btn = document.getElementById('addBtn');
+  if(currentView==='customers'){ btn.textContent='+ New Customer'; btn.onclick=openAdd; }
+  else if(currentView==='meetings'){ btn.textContent='+ New Meeting'; btn.onclick=openAddMeeting; }
+  else { btn.textContent='+ New Task'; btn.onclick=openAddTodo; }
+}
+function loadCurrentView(){
+  if(currentView==='customers') refreshCustomers();
+  else if(currentView==='meetings') refreshMeetings();
+  else refreshTodos();
+}
+
+/* ================== MEETINGS ================== */
+let meetings = [];
+let meetingFilterType = 'ALL';
+const MEETING_PLATFORMS = ['Google Meet','Zoom','Google Teams','Other'];
+const MEETING_COMPANIES = ['LIC','Care Health','Axis Max Life','CSC','Other'];
+
+async function refreshMeetings(){
+  app.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    meetings = await apiList('meetings');
+    renderMeetingsView();
+  }catch(err){
+    app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
+  }
+}
+
+function dtDate(v){ return v ? String(v).substring(0,10) : ''; }
+function dtPretty(v){
+  if(!v) return '';
+  const parts = String(v).split('T');
+  if(parts.length<2) return v;
+  const d = new Date(parts[0]+'T00:00:00');
+  const dateLabel = d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  return dateLabel + ' · ' + parts[1];
+}
+
+function meetingUpcomingPanel(){
+  const d0 = todayStr(), d1 = addDaysStr(d0,1), d2 = addDaysStr(d0,2);
+  const cols = [
+    {cls:'today', label:'Today', date:d0},
+    {cls:'tomorrow', label:'Tomorrow', date:d1},
+    {cls:'dayafter', label:'Day After Tomorrow', date:d2}
+  ];
+  let html = '<div class="upcomingWrap"><div class="upcomingTitle">📅 Meetings - Today &amp; Upcoming (Next 3 Days)</div><div class="upcomingGrid">';
+  cols.forEach(col=>{
+    const items = meetings.filter(m=> dtDate(m.DateTime)===col.date);
+    html += `<div class="upcomingCol ${col.cls}"><div class="upcomingColHead"><div><div class="dlabel">${col.label}</div><div class="ddate">${prettyDate(col.date)}</div></div><div class="upcomingCount">${items.length}</div></div>`;
+    if(items.length===0){ html += '<div class="upcomingEmpty">Nothing scheduled</div>'; }
+    else {
+      items.forEach(m=>{
+        html += `<div class="upcomingItem" onclick="openUpdateMeeting('${m.ID}')">
+          <div class="uName">${escapeHtml(m.MeetingWith)}</div>
+          <div class="uPhone">${escapeHtml(m.Company||'')}</div>
+          <span class="upcomingTag ${m.Type==='Online'?'tag-appt':'tag-followup'}">${m.Type==='Online'?('Online · '+escapeHtml(m.Platform||'')):'Offline'}</span>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function renderMeetingsStats(){
+  const today = todayStr();
+  const total = meetings.length;
+  const todayCount = meetings.filter(m=>dtDate(m.DateTime)===today).length;
+  const online = meetings.filter(m=>m.Type==='Online').length;
+  const offline = meetings.filter(m=>m.Type==='Offline').length;
+  let html = '<div class="stats">';
+  html += statCardM('ALL','Total Meetings', total, '🤝', '#2b5c8f');
+  html += statCardM('TODAY','Today', todayCount, '📅', '#b8862d');
+  html += statCardM('Online','Online', online, '💻', '#0f7a6b');
+  html += statCardM('Offline','Offline', offline, '🏢', '#8a5a4a');
+  html += '</div>';
+  return html;
+}
+function statCardM(key,label,num,icon,color){
+  const active = meetingFilterType===key ? ' active' : '';
+  return '<div class="stat'+active+'" style="--sc:'+color+'" onclick="setMeetingFilter(\''+key+'\')"><span class="icon">'+icon+'</span><div class="num">'+num+'</div><div class="lbl">'+label+'</div></div>';
+}
+function setMeetingFilter(key){ meetingFilterType = key; renderMeetingsView(); }
+
+function getFilteredMeetings(){
+  return meetings.filter(m=>{
+    if(meetingFilterType==='TODAY') return dtDate(m.DateTime)===todayStr();
+    if(meetingFilterType==='Online'||meetingFilterType==='Offline') return m.Type===meetingFilterType;
+    return true;
+  }).sort((a,b)=> String(a.DateTime||'9999').localeCompare(String(b.DateTime||'9999')));
+}
+
+function renderMeetingsTable(){
+  const list = getFilteredMeetings();
+  if(list.length===0){
+    return '<div class="card"><div class="empty"><h3>No meetings found</h3><p>Click "+ New Meeting" above to add one.</p></div></div>';
+  }
+  let rows = list.map(m=>{
+    const joinBtn = (m.Type==='Online' && m.MeetingLink) ? `<a href="${escapeAttr(m.MeetingLink)}" target="_blank" rel="noopener" class="btn-secondary" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">Join</a>` : '';
+    return `<tr>
+      <td data-label="Meeting With"><div class="name-cell">${escapeHtml(m.MeetingWith)}</div><div class="sub-cell">${escapeHtml(m.Company||'')}</div></td>
+      <td data-label="Type"><span class="badge ${m.Type==='Online'?'b-appt':'b-postponed'}">${escapeHtml(m.Type||'')}</span>${m.Type==='Online'?'<div class="sub-cell">'+escapeHtml(m.Platform||'')+'</div>':''}</td>
+      <td data-label="Date & Time">${escapeHtml(dtPretty(m.DateTime))}</td>
+      <td data-label="Link">${joinBtn}</td>
+      <td data-label="Remarks">${escapeHtml(m.Remarks||'')}</td>
+      <td data-label="Actions"><div class="rowActions">
+        <button class="btn-secondary" onclick="openUpdateMeeting('${m.ID}')">Update</button>
+        <button class="btn-danger" onclick="removeMeeting('${m.ID}','${escapeAttr(m.MeetingWith)}')">Delete</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  return `<div class="card"><table>
+    <thead><tr><th>Meeting With</th><th>Type</th><th>Date &amp; Time</th><th>Link</th><th>Remarks</th><th>Actions</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+function renderMeetingsView(){
+  app.innerHTML = meetingUpcomingPanel() + renderMeetingsStats() + renderMeetingsTable();
+}
+
+function meetingFieldsHtml(values){
+  const type = values.Type || 'Online';
+  let html = `<div class="field"><label>Meeting Type</label><select id="mf_type" onchange="onMeetingTypeChange()">
+    <option value="Online" ${type==='Online'?'selected':''}>Online</option>
+    <option value="Offline" ${type==='Offline'?'selected':''}>Offline</option>
+  </select></div>`;
+  html += `<div id="meetingOnlineWrap">${type==='Online'?meetingOnlineFieldsHtml(values):''}</div>`;
+  return html;
+}
+function meetingOnlineFieldsHtml(values){
+  const platform = values.Platform || MEETING_PLATFORMS[0];
+  let html = `<div class="field"><label>Platform</label><select id="mf_platform">`
+    + MEETING_PLATFORMS.map(p=>`<option value="${p}" ${platform===p?'selected':''}>${p}</option>`).join('')
+    + `</select></div>`;
+  html += `<div class="field"><label>Meeting Link</label><input type="text" id="mf_link" value="${escapeAttr(values.MeetingLink||'')}" placeholder="https://meet.google.com/..."></div>`;
+  return html;
+}
+function onMeetingTypeChange(){
+  const type = document.getElementById('mf_type').value;
+  document.getElementById('meetingOnlineWrap').innerHTML = type==='Online' ? meetingOnlineFieldsHtml({}) : '';
+}
+function meetingCompanyFieldHtml(values){
+  const isOther = values.Company && MEETING_COMPANIES.indexOf(values.Company)===-1;
+  let html = `<div class="field"><label>Company</label><select id="mf_company" onchange="onMeetingCompanyChange()">`
+    + MEETING_COMPANIES.map(c=>`<option value="${c}" ${(isOther? c==='Other' : values.Company===c)?'selected':''}>${c}</option>`).join('')
+    + `</select></div>`;
+  html += `<div class="field" id="mf_companyOtherWrap" style="${isOther?'':'display:none;'}"><label>Specify Company</label><input type="text" id="mf_companyOther" value="${isOther?escapeAttr(values.Company):''}" placeholder="Company name"></div>`;
+  return html;
+}
+function onMeetingCompanyChange(){
+  const val = document.getElementById('mf_company').value;
+  document.getElementById('mf_companyOtherWrap').style.display = (val==='Other') ? '' : 'none';
+}
+
+function showMeetingModal({title,hint,values,onSave}){
+  const html = `
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h2>${escapeHtml(title)}</h2>
+      <div class="hint">${escapeHtml(hint)}</div>
+      <div class="field"><label>Meeting With *</label><input type="text" id="mf_with" value="${escapeAttr(values.MeetingWith||'')}" placeholder="Person / purpose"></div>
+      ${meetingFieldsHtml(values)}
+      ${meetingCompanyFieldHtml(values)}
+      <div class="field"><label>Date &amp; Time</label><input type="datetime-local" id="mf_datetime" value="${values.DateTime||''}"></div>
+      <div class="field"><label>Remarks</label><textarea id="mf_remarks" placeholder="Notes about this meeting...">${escapeHtml(values.Remarks||'')}</textarea></div>
+      <div class="modalActions">
+        <button class="btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary" id="saveMeetingBtn">Save</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('saveMeetingBtn').addEventListener('click', async ()=>{
+    const withWhom = document.getElementById('mf_with').value.trim();
+    if(!withWhom){ alert('Please enter who the meeting is with'); return; }
+    const type = document.getElementById('mf_type').value;
+    const companySel = document.getElementById('mf_company').value;
+    const companyOther = document.getElementById('mf_companyOther');
+    const vals = {
+      MeetingWith: withWhom,
+      Type: type,
+      Platform: type==='Online' ? (document.getElementById('mf_platform')?document.getElementById('mf_platform').value:'') : '',
+      MeetingLink: type==='Online' ? (document.getElementById('mf_link')?document.getElementById('mf_link').value.trim():'') : '',
+      Company: companySel==='Other' ? (companyOther?companyOther.value.trim():'') : companySel,
+      DateTime: document.getElementById('mf_datetime').value,
+      Remarks: document.getElementById('mf_remarks').value.trim()
+    };
+    const btn = document.getElementById('saveMeetingBtn');
+    btn.disabled = true; btn.textContent='Saving...';
+    try{ await onSave(vals); }
+    catch(err){ alert('Error: '+err.message); btn.disabled=false; btn.textContent='Save'; }
+  });
+}
+
+function openAddMeeting(){
+  showMeetingModal({
+    title:'Add New Meeting', hint:'Fill in the meeting details', values:{Type:'Online'},
+    onSave: async (vals)=>{
+      await apiAdd('meetings', vals);
+      showToast('Meeting saved ✅');
+      closeModal();
+      refreshMeetings();
+    }
+  });
+}
+function openUpdateMeeting(id){
+  const m = meetings.find(x=>x.ID===id);
+  if(!m) return;
+  showMeetingModal({
+    title: m.MeetingWith+' - Update', hint:'Update this meeting', values: m,
+    onSave: async (vals)=>{
+      vals.ID = id;
+      await apiUpdate('meetings', vals);
+      showToast('Meeting updated ✅');
+      closeModal();
+      refreshMeetings();
+    }
+  });
+}
+async function removeMeeting(id,name){
+  if(!confirm('Delete meeting with '+name+'? This cannot be undone.')) return;
+  try{ await apiDelete('meetings', id); showToast('Deleted'); refreshMeetings(); }
+  catch(err){ showToast('Error: '+err.message); }
+}
+
+/* ================== TO-DO LIST ================== */
+let todos = [];
+let todoFilter = 'ALL';
+
+async function refreshTodos(){
+  app.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    todos = await apiList('todos');
+    renderTodosView();
+  }catch(err){
+    app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
+  }
+}
+
+function renderTodosStats(){
+  const today = todayStr();
+  const total = todos.length;
+  const pending = todos.filter(t=>t.Status!=='Completed').length;
+  const completed = todos.filter(t=>t.Status==='Completed').length;
+  const overdue = todos.filter(t=> t.Status!=='Completed' && dtDate(t.DateTime) && dtDate(t.DateTime)<today).length;
+  let html = '<div class="stats">';
+  html += statCardT('ALL','Total Tasks', total, '📋', '#2b5c8f');
+  html += statCardT('PENDING','Pending', pending, '⏳', '#b8862d');
+  html += statCardT('OVERDUE','Overdue', overdue, '⚠️', '#b3402f');
+  html += statCardT('DONE','Completed', completed, '✅', '#1f7a4d');
+  html += '</div>';
+  return html;
+}
+function statCardT(key,label,num,icon,color){
+  const active = todoFilter===key ? ' active' : '';
+  return '<div class="stat'+active+'" style="--sc:'+color+'" onclick="setTodoFilter(\''+key+'\')"><span class="icon">'+icon+'</span><div class="num">'+num+'</div><div class="lbl">'+label+'</div></div>';
+}
+function setTodoFilter(key){ todoFilter = key; renderTodosView(); }
+
+function getFilteredTodos(){
+  const today = todayStr();
+  return todos.filter(t=>{
+    if(todoFilter==='PENDING') return t.Status!=='Completed';
+    if(todoFilter==='DONE') return t.Status==='Completed';
+    if(todoFilter==='OVERDUE') return t.Status!=='Completed' && dtDate(t.DateTime) && dtDate(t.DateTime)<today;
+    return true;
+  }).sort((a,b)=> String(a.DateTime||'9999').localeCompare(String(b.DateTime||'9999')));
+}
+
+function renderTodosTable(){
+  const list = getFilteredTodos();
+  if(list.length===0){
+    return '<div class="card"><div class="empty"><h3>No tasks found</h3><p>Click "+ New Task" above to add one.</p></div></div>';
+  }
+  let rows = list.map(t=>{
+    const done = t.Status==='Completed';
+    return `<tr>
+      <td data-label="Work">${escapeHtml(t.NameOfWork)}</td>
+      <td data-label="Purpose">${escapeHtml(t.Purpose||'')}</td>
+      <td data-label="Date & Time">${escapeHtml(dtPretty(t.DateTime))}</td>
+      <td data-label="Status"><span class="badge ${done?'b-converted':'b-postponed'}">${done?'Completed ✅':'Pending'}</span></td>
+      <td data-label="Remarks">${escapeHtml(t.Remarks||'')}</td>
+      <td data-label="Actions"><div class="rowActions">
+        <button class="btn-secondary" onclick="toggleTodoStatus('${t.ID}')">${done?'Mark Pending':'Mark Done'}</button>
+        <button class="btn-outline" onclick="openUpdateTodo('${t.ID}')">Update</button>
+        <button class="btn-danger" onclick="removeTodo('${t.ID}','${escapeAttr(t.NameOfWork)}')">Delete</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  return `<div class="card"><table>
+    <thead><tr><th>Work</th><th>Purpose</th><th>Date &amp; Time</th><th>Status</th><th>Remarks</th><th>Actions</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+function renderTodosView(){
+  app.innerHTML = renderTodosStats() + renderTodosTable();
+}
+
+function showTodoModal({title,hint,values,onSave}){
+  const html = `
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h2>${escapeHtml(title)}</h2>
+      <div class="hint">${escapeHtml(hint)}</div>
+      <div class="field"><label>Name of Work *</label><input type="text" id="tf_name" value="${escapeAttr(values.NameOfWork||'')}" placeholder="e.g. Submit policy documents"></div>
+      <div class="field"><label>Purpose</label><input type="text" id="tf_purpose" value="${escapeAttr(values.Purpose||'')}" placeholder="Why this task is needed"></div>
+      <div class="field"><label>Date &amp; Time</label><input type="datetime-local" id="tf_datetime" value="${values.DateTime||''}"></div>
+      <div class="field"><label>Status</label><select id="tf_status">
+        <option value="Pending" ${values.Status!=='Completed'?'selected':''}>Pending</option>
+        <option value="Completed" ${values.Status==='Completed'?'selected':''}>Completed</option>
+      </select></div>
+      <div class="field"><label>Remarks</label><textarea id="tf_remarks" placeholder="Any notes...">${escapeHtml(values.Remarks||'')}</textarea></div>
+      <div class="modalActions">
+        <button class="btn-outline" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary" id="saveTodoBtn">Save</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('saveTodoBtn').addEventListener('click', async ()=>{
+    const name = document.getElementById('tf_name').value.trim();
+    if(!name){ alert('Please enter the name of work'); return; }
+    const vals = {
+      NameOfWork:name,
+      Purpose: document.getElementById('tf_purpose').value.trim(),
+      DateTime: document.getElementById('tf_datetime').value,
+      Status: document.getElementById('tf_status').value,
+      Remarks: document.getElementById('tf_remarks').value.trim()
+    };
+    const btn = document.getElementById('saveTodoBtn');
+    btn.disabled = true; btn.textContent='Saving...';
+    try{ await onSave(vals); }
+    catch(err){ alert('Error: '+err.message); btn.disabled=false; btn.textContent='Save'; }
+  });
+}
+function openAddTodo(){
+  showTodoModal({
+    title:'Add New Task', hint:'Fill in the task details', values:{Status:'Pending'},
+    onSave: async (vals)=>{
+      await apiAdd('todos', vals);
+      showToast('Task saved ✅');
+      closeModal();
+      refreshTodos();
+    }
+  });
+}
+function openUpdateTodo(id){
+  const t = todos.find(x=>x.ID===id);
+  if(!t) return;
+  showTodoModal({
+    title: t.NameOfWork+' - Update', hint:'Update this task', values: t,
+    onSave: async (vals)=>{
+      vals.ID = id;
+      await apiUpdate('todos', vals);
+      showToast('Task updated ✅');
+      closeModal();
+      refreshTodos();
+    }
+  });
+}
+async function toggleTodoStatus(id){
+  const t = todos.find(x=>x.ID===id);
+  if(!t) return;
+  try{
+    await apiUpdate('todos', {...t, ID:id, Status: t.Status==='Completed' ? 'Pending' : 'Completed'});
+    showToast('Updated ✅');
+    refreshTodos();
+  }catch(err){ showToast('Error: '+err.message); }
+}
+async function removeTodo(id,name){
+  if(!confirm('Delete task "'+name+'"? This cannot be undone.')) return;
+  try{ await apiDelete('todos', id); showToast('Deleted'); refreshTodos(); }
+  catch(err){ showToast('Error: '+err.message); }
+}
+
 /* ================== SETTINGS ================== */
 function openSettings(){
   const html = `
@@ -663,16 +1073,16 @@ function openSettings(){
       if(!url){ alert('Please paste a URL'); return; }
       saveConfig(url);
       closeModal();
-      refresh();
+      loadCurrentView();
     });
   });
 }
-document.getElementById('addBtn').addEventListener('click', openAdd);
 document.getElementById('settingsBtn').addEventListener('click', openSettings);
 document.getElementById('lockNowBtn').addEventListener('click', ()=> lockApp());
 
 /* ================== APP INIT (after unlock) ================== */
 function initApp(){
+  updateAddButton();
   if(!WEBAPP_URL){
     app.innerHTML = `<div class="setupBox">
       <h2>🔗 First-time Setup</h2>
@@ -684,11 +1094,11 @@ function initApp(){
       const url = document.getElementById('firstUrlInput').value.trim();
       if(!url){ alert('Please paste a URL'); return; }
       saveConfig(url);
-      refresh();
+      loadCurrentView();
     });
     return;
   }
-  refresh();
+  loadCurrentView();
 }
 
 /* ================== PIN LOCK SYSTEM ================== */
