@@ -210,11 +210,13 @@
     header .sub{font-size:.85rem;max-width:58vw;overflow:hidden;text-overflow:ellipsis;opacity:.9;}
     .headerRight{justify-self:auto;grid-column:auto;}
     .headerRight button{padding:7px 10px;font-size:.8rem;}
-    table thead{display:none;}
-    table, tbody, tr, td{display:block;width:100%;}
-    tr{border-bottom:2px solid var(--line);padding:10px 0;}
-    td{border:none;padding:4px 0;display:flex;justify-content:space-between;gap:10px;}
-    td::before{content:attr(data-label);font-weight:600;color:var(--muted);font-size:.72rem;text-transform:uppercase;flex-shrink:0;}
+    table:not(.matrixTable) thead{display:none;}
+    table:not(.matrixTable), table:not(.matrixTable) tbody, table:not(.matrixTable) tr, table:not(.matrixTable) td{display:block;width:100%;}
+    table:not(.matrixTable) tr{border-bottom:2px solid var(--line);padding:10px 0;}
+    table:not(.matrixTable) td{border:none;padding:4px 0;display:flex;justify-content:space-between;gap:10px;}
+    table:not(.matrixTable) td::before{content:attr(data-label);font-weight:600;color:var(--muted);font-size:.72rem;text-transform:uppercase;flex-shrink:0;}
+    .matrixTable{font-size:.78rem;}
+    .matrixTable th, .matrixTable td{padding:8px 10px;white-space:nowrap;}
     .rowActions{justify-content:flex-end;}
   }
 </style>
@@ -1347,7 +1349,7 @@ const REPORT_CATEGORIES = ['Insurance','Real Estate','Mutual Funds'];
 
 function reportMatrixHtml(title, rows, rowKeyFn){
   let html = `<div class="card" style="margin-bottom:18px;"><div style="padding:14px 16px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--line);">${escapeHtml(title)}</div>
-  <table><thead><tr><th>${rows.label}</th>`;
+  <table class="matrixTable"><thead><tr><th>${rows.label}</th>`;
   STATUS_LIST.forEach(s=> html += `<th>${s.label}</th>`);
   html += `<th>Total</th></tr></thead><tbody>`;
   rows.keys.forEach(key=>{
