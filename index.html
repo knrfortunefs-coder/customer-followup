@@ -104,7 +104,6 @@
   tr:last-child td{border-bottom:none;}
   tr:hover td{background:#faf8f2;}
   .name-cell{font-weight:600;color:var(--navy);}
-  .phone-cell{color:var(--muted);font-size:.83rem;}
   .sub-cell{color:var(--muted);font-size:.78rem;margin-top:2px;}
   .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600;white-space:nowrap;}
   .b-new{background:#e6ecf7;color:#2b4d8f;}
@@ -189,6 +188,14 @@
   .upcomingItem .uName{font-weight:600;color:var(--navy);font-size:.85rem;}
   .upcomingItem .uPhone{font-size:.75rem;color:var(--muted);}
   .upcomingItem .uService{font-size:.72rem;color:var(--teal);font-weight:600;margin-top:2px;}
+  .phoneActions{display:inline-flex;gap:6px;margin-left:6px;vertical-align:middle;}
+  .phoneBtn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;text-decoration:none;font-size:.85rem;}
+  .phoneCall{background:var(--teal-light);}
+  .phoneWa{background:#dcf5e3;}
+  .phone-cell{color:var(--muted);font-size:.83rem;display:flex;align-items:center;flex-wrap:wrap;gap:2px;}
+  .historyEntry{border-left:3px solid var(--line);padding:6px 0 10px 12px;margin-bottom:4px;}
+  .historyTime{font-size:.72rem;color:var(--muted);margin-bottom:4px;}
+  .historyNotes{font-size:.85rem;color:var(--ink);margin-top:5px;}
   .upcomingTag{display:inline-block;font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:20px;margin-top:3px;}
   .tag-appt{background:var(--teal-light);color:var(--teal);}
   .tag-followup{background:#eee9dc;color:var(--muted);}
@@ -231,9 +238,11 @@
 </header>
 
 <nav class="tabs" id="tabBar">
-  <button class="tabBtn active" data-view="customers" onclick="switchView('customers')">👥 Customers</button>
+  <button class="tabBtn active" data-view="home" onclick="switchView('home')">🏠 Home</button>
+  <button class="tabBtn" data-view="customers" onclick="switchView('customers')">👥 Customers</button>
   <button class="tabBtn" data-view="meetings" onclick="switchView('meetings')">🤝 Meetings</button>
   <button class="tabBtn" data-view="todos" onclick="switchView('todos')">✅ To-Do List</button>
+  <button class="tabBtn" data-view="reports" onclick="switchView('reports')">📊 Reports</button>
 </nav>
 
 <main id="app">
@@ -303,6 +312,7 @@ async function apiSend(payload){
 async function apiAdd(entity, record){ return apiSend({action:'add', entity, record}); }
 async function apiUpdate(entity, record){ return apiSend({action:'update', entity, record}); }
 async function apiDelete(entity, id){ return apiSend({action:'delete', entity, id}); }
+async function apiBulkAdd(entity, records){ return apiSend({action:'bulkAdd', entity, records}); }
 
 /* ================== RENDER ================== */
 const app = document.getElementById('app');
@@ -378,7 +388,7 @@ function renderUpcoming(){
         const svc = serviceSummary(c);
         html += `<div class="upcomingItem" onclick="openUpdate('${c.ID}')">
           <div class="uName">${escapeHtml(c.Name)}</div>
-          <div class="uPhone">${escapeHtml(c.Phone)}</div>
+          <div class="uPhone">${escapeHtml(c.Phone)}${phoneActionsHtml(c.Phone, c.Name)}</div>
           ${svc?'<div class="uService">'+escapeHtml(svc)+'</div>':(c.Category?'<div class="uService">'+escapeHtml(c.Category)+'</div>':'')}
           <span class="upcomingTag ${type==='appt'?'tag-appt':'tag-followup'}">${type==='appt'?'Appointment':'Follow-up'}</span>
         </div>`;
@@ -425,6 +435,9 @@ function renderToolbar(){
   return `<div class="toolbar">
     <input type="text" id="searchBox" placeholder="Search by name or phone..." value="${escapeAttr(searchText)}">
     <select id="statusFilterSel">${opts}</select>
+    <button class="btn-outline" onclick="downloadCustomerTemplate()">⬇️ Template</button>
+    <button class="btn-secondary" onclick="document.getElementById('importFileInput').click()">📥 Import Excel/CSV</button>
+    <input type="file" id="importFileInput" accept=".csv" style="display:none" onchange="handleImportFile(event)">
   </div>`;
 }
 
@@ -469,12 +482,13 @@ function renderTable(){
     const svc = serviceSummary(c);
     return `<tr>
       <td data-label="Name"><div class="name-cell">${escapeHtml(c.Name)}</div><div class="phone-cell">${escapeHtml(c.Category||'')}</div>${svc?'<div class="sub-cell">'+escapeHtml(svc)+'</div>':''}</td>
-      <td data-label="Phone">${escapeHtml(c.Phone)}</td>
+      <td data-label="Phone">${escapeHtml(c.Phone)}${phoneActionsHtml(c.Phone, c.Name)}</td>
       <td data-label="Stage"><span class="badge ${sm.cls}">${sm.label}</span></td>
       <td data-label="Follow-up">${appointmentTag(c.AppointmentDate)}${followupTag(c.NextFollowupDate)}</td>
       <td data-label="Notes">${escapeHtml(c.Notes||'')}</td>
       <td data-label="Actions"><div class="rowActions">
         <button class="btn-secondary" onclick="openUpdate('${c.ID}')">Update</button>
+        <button class="btn-outline" onclick="openHistory('${c.ID}','${escapeAttr(c.Name)}')">History</button>
         <button class="btn-danger" onclick="removeCustomer('${c.ID}','${escapeAttr(c.Name)}')">Delete</button>
       </div></td>
     </tr>`;
@@ -581,6 +595,121 @@ async function removeCustomer(id,name){
   }catch(err){ showToast('Error: '+err.message); }
 }
 
+async function openHistory(id, name){
+  const html = `<div class="overlay" id="overlay"><div class="modal">
+    <h2>🕒 ${escapeHtml(name)} - History</h2>
+    <div class="hint">Timeline of every update for this customer</div>
+    <div id="historyBody"><div class="loading">Loading...</div></div>
+    <div class="modalActions"><button class="btn-outline" onclick="closeModal()">Close</button></div>
+  </div></div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  try{
+    const all = await apiList('history');
+    const entries = all.filter(h=>h.CustomerID===id).sort((a,b)=> String(b.Timestamp||'').localeCompare(String(a.Timestamp||'')));
+    const body = document.getElementById('historyBody');
+    if(!body) return; // modal closed before load finished
+    if(entries.length===0){
+      body.innerHTML = '<div class="upcomingEmpty">No history yet.</div>';
+      return;
+    }
+    body.innerHTML = entries.map(h=>{
+      const sm = statusMeta(h.Status);
+      const ts = String(h.Timestamp||'').replace('T',' ');
+      return `<div class="historyEntry">
+        <div class="historyTime">${escapeHtml(ts)}</div>
+        <span class="badge ${sm.cls}">${sm.label}</span>
+        ${h.NextFollowupDate?'<div class="sub-cell">Next follow-up: '+escapeHtml(h.NextFollowupDate)+'</div>':''}
+        ${h.Notes?'<div class="historyNotes">'+escapeHtml(h.Notes)+'</div>':''}
+      </div>`;
+    }).join('');
+  }catch(err){
+    const body = document.getElementById('historyBody');
+    if(body) body.innerHTML = '<div class="upcomingEmpty">Could not load history: '+escapeHtml(err.message)+'</div>';
+  }
+}
+
+/* ================== BULK IMPORT (CSV) ================== */
+const IMPORT_COLUMNS = ['Name','Phone','Category','SubCategory','Company','Status','AppointmentDate','NextFollowupDate','Notes'];
+function downloadCustomerTemplate(){
+  const sample = [
+    'Name,Phone,Category,SubCategory,Company,Status,AppointmentDate,NextFollowupDate,Notes',
+    'Ravi Kumar,9876543210,Insurance,Health Insurance,Care Health,New,,2026-08-20,Interested in family floater plan',
+    'Lakshmi Devi,9123456780,Real Estate,Open Plots,,New,,2026-08-22,Looking for plots near Guntur'
+  ].join('\n');
+  const blob = new Blob([sample], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'customer_import_template.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i], next = text[i+1];
+    if(inQuotes){
+      if(c==='"' && next==='"'){ field+='"'; i++; }
+      else if(c==='"'){ inQuotes=false; }
+      else field+=c;
+    } else {
+      if(c==='"') inQuotes=true;
+      else if(c===','){ row.push(field); field=''; }
+      else if(c==='\n' || c==='\r'){
+        if(c==='\r' && next==='\n') i++;
+        row.push(field); field=''; rows.push(row); row=[];
+      } else field+=c;
+    }
+  }
+  if(field.length>0 || row.length>0){ row.push(field); rows.push(row); }
+  return rows.filter(r=> r.length>1 || (r.length===1 && r[0]!==''));
+}
+function handleImportFile(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e)=>{
+    try{
+      const rows = parseCSV(e.target.result);
+      if(rows.length<2){ alert('The file has no data rows.'); return; }
+      const headerRow = rows[0].map(h=>h.trim());
+      const idx = {};
+      headerRow.forEach((h,i)=>{ idx[h.toLowerCase()] = i; });
+      const records = [];
+      for(let r=1;r<rows.length;r++){
+        const row = rows[r];
+        if(row.every(v=>String(v).trim()==='')) continue;
+        const get = (col)=>{
+          const i = idx[col.toLowerCase()];
+          return i!==undefined ? String(row[i]||'').trim() : '';
+        };
+        const name = get('Name'), phone = get('Phone');
+        if(!name || !phone) continue;
+        records.push({
+          Name:name, Phone:phone,
+          Category: get('Category')||'Insurance',
+          SubCategory: get('SubCategory'),
+          Company: get('Company'),
+          Status: get('Status')||'New',
+          AppointmentDate: get('AppointmentDate'),
+          NextFollowupDate: get('NextFollowupDate'),
+          Notes: get('Notes')
+        });
+      }
+      if(records.length===0){ alert('No valid rows found. Make sure Name and Phone columns are filled in.'); return; }
+      if(!confirm('Import '+records.length+' customers? This will add them to your Google Sheet.')) { event.target.value=''; return; }
+      showToast('Importing '+records.length+' customers...');
+      await apiBulkAdd('customers', records);
+      showToast(records.length+' customers imported ✅');
+      event.target.value = '';
+      refreshCustomers();
+    }catch(err){
+      alert('Import failed: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
 function showModal({title,hint,values,onSave}){
   let opts = STATUS_LIST.map(s=>`<option value="${s.key}" ${values.Status===s.key?'selected':''}>${s.label}</option>`).join('');
   const html = `
@@ -651,7 +780,7 @@ function showToast(msg){
 }
 
 /* ================== VIEW SWITCHING ================== */
-let currentView = 'customers';
+let currentView = 'home';
 function switchView(view){
   currentView = view;
   document.querySelectorAll('.tabBtn').forEach(b=> b.classList.toggle('active', b.dataset.view===view));
@@ -660,14 +789,37 @@ function switchView(view){
 }
 function updateAddButton(){
   const btn = document.getElementById('addBtn');
-  if(currentView==='customers'){ btn.textContent='+ New Customer'; btn.onclick=openAdd; }
-  else if(currentView==='meetings'){ btn.textContent='+ New Meeting'; btn.onclick=openAddMeeting; }
-  else { btn.textContent='+ New Task'; btn.onclick=openAddTodo; }
+  if(currentView==='customers'){ btn.style.display=''; btn.textContent='+ New Customer'; btn.onclick=openAdd; }
+  else if(currentView==='meetings'){ btn.style.display=''; btn.textContent='+ New Meeting'; btn.onclick=openAddMeeting; }
+  else if(currentView==='todos'){ btn.style.display=''; btn.textContent='+ New Task'; btn.onclick=openAddTodo; }
+  else { btn.style.display='none'; }
 }
 function loadCurrentView(){
-  if(currentView==='customers') refreshCustomers();
+  if(currentView==='home') refreshHome();
+  else if(currentView==='customers') refreshCustomers();
   else if(currentView==='meetings') refreshMeetings();
-  else refreshTodos();
+  else if(currentView==='todos') refreshTodos();
+  else if(currentView==='reports') refreshReports();
+}
+
+/* ================== PHONE SHORTCUTS (Call / WhatsApp) ================== */
+function cleanPhoneForWa(phone){
+  let d = String(phone||'').replace(/[^\d]/g,'');
+  if(d.length===10) d = '91'+d; // assume India if no country code given
+  return d;
+}
+function telLink(phone){ return 'tel:'+String(phone||'').replace(/[^\d+]/g,''); }
+function waLink(phone, msg){
+  const d = cleanPhoneForWa(phone);
+  return 'https://wa.me/'+d+(msg?('?text='+encodeURIComponent(msg)):'');
+}
+function phoneActionsHtml(phone, name){
+  if(!phone) return '';
+  const msg = name ? ('Hi '+name+', ') : 'Hi, ';
+  return `<div class="phoneActions" onclick="event.stopPropagation()">
+    <a href="${escapeAttr(telLink(phone))}" class="phoneBtn phoneCall" title="Call">📞</a>
+    <a href="${escapeAttr(waLink(phone,msg))}" target="_blank" rel="noopener" class="phoneBtn phoneWa" title="WhatsApp">💬</a>
+  </div>`;
 }
 
 /* ================== MEETINGS ================== */
@@ -1101,6 +1253,150 @@ async function removeTodo(id,name){
   if(!confirm('Delete task "'+name+'"? This cannot be undone.')) return;
   try{ await apiDelete('todos', id); showToast('Deleted'); refreshTodos(); }
   catch(err){ showToast('Error: '+err.message); }
+}
+
+/* ================== HOME DASHBOARD ================== */
+async function refreshHome(){
+  app.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    const [c, m, t] = await Promise.all([apiList('customers'), apiList('meetings'), apiList('todos')]);
+    customers = c; meetings = m; todos = t;
+    renderHomeView();
+  }catch(err){
+    app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
+  }
+}
+
+function homeTodayItems(){
+  const today = todayStr();
+  const items = [];
+  customers.forEach(c=>{
+    const appt = normDate(c.AppointmentDate), next = normDate(c.NextFollowupDate);
+    if(appt===today) items.push({icon:'📅', label:'Appointment', name:c.Name, sub:c.Phone+(serviceSummary(c)?(' · '+serviceSummary(c)):''), onclick:`openUpdate('${c.ID}')`});
+    if(next===today && next!==appt) items.push({icon:'🔁', label:'Follow-up', name:c.Name, sub:c.Phone+(serviceSummary(c)?(' · '+serviceSummary(c)):''), onclick:`openUpdate('${c.ID}')`});
+  });
+  meetings.forEach(m=>{
+    if(dtDate(m.StartDateTime)===today) items.push({icon: m.Type==='Online'?'💻':'🏢', label:m.Type+' Meeting', name:m.MeetingWith, sub:(m.Company||'')+(m.Type==='Offline'&&m.Location?' · '+m.Location:''), onclick:`openUpdateMeeting('${m.ID}')`});
+  });
+  todos.forEach(t=>{
+    if(t.Status!=='Completed' && dtDate(t.DateTime)===today) items.push({icon:'✅', label:'Task Due', name:t.NameOfWork, sub:t.Purpose||'', onclick:`openUpdateTodo('${t.ID}')`});
+  });
+  return items;
+}
+function homeAttentionItems(){
+  const today = todayStr();
+  const items = [];
+  customers.forEach(c=>{
+    const next = normDate(c.NextFollowupDate);
+    if(next && next<today) items.push({icon:'⚠️', label:'Missed Follow-up', name:c.Name, sub:c.Phone, onclick:`openUpdate('${c.ID}')`});
+  });
+  todos.forEach(t=>{
+    if(t.Status!=='Completed' && dtDate(t.DateTime) && dtDate(t.DateTime)<today) items.push({icon:'⚠️', label:'Overdue Task', name:t.NameOfWork, sub:t.Purpose||'', onclick:`openUpdateTodo('${t.ID}')`});
+  });
+  return items;
+}
+function homeItemsListHtml(items, emptyMsg){
+  if(items.length===0) return '<div class="upcomingEmpty">'+emptyMsg+'</div>';
+  return items.map(it=>`<div class="upcomingItem" onclick="${it.onclick}">
+    <div class="uName">${it.icon} ${escapeHtml(it.name)}</div>
+    <div class="uPhone">${escapeHtml(it.sub||'')}</div>
+    <span class="upcomingTag tag-followup">${escapeHtml(it.label)}</span>
+  </div>`).join('');
+}
+
+function renderHomeView(){
+  const today = todayStr();
+  const todayCustomers = customers.filter(c=> normDate(c.AppointmentDate)===today || normDate(c.NextFollowupDate)===today).length;
+  const todayMeetings = meetings.filter(m=> dtDate(m.StartDateTime)===today).length;
+  const pendingTasks = todos.filter(t=> t.Status!=='Completed').length;
+  const attention = homeAttentionItems();
+
+  let html = '<div class="stats">';
+  html += statCardHome('👥','Total Customers', customers.length, '#2b5c8f');
+  html += statCardHome('📅','Customer Items Today', todayCustomers, '#b8862d');
+  html += statCardHome('🤝','Meetings Today', todayMeetings, '#0f7a6b');
+  html += statCardHome('📋','Pending Tasks', pendingTasks, '#5b6fd6');
+  html += statCardHome('⚠️','Needs Attention', attention.length, '#b3402f');
+  html += '</div>';
+
+  html += `<div class="upcomingWrap"><div class="upcomingTitle">🎯 Today's Focus</div><div class="upcomingGrid" style="grid-template-columns:1fr;">
+    <div class="upcomingCol today">${homeItemsListHtml(homeTodayItems(), 'Nothing scheduled for today across Customers, Meetings, or Tasks.')}</div>
+  </div></div>`;
+
+  html += `<div class="upcomingWrap"><div class="upcomingTitle">⚠️ Needs Attention</div><div class="upcomingGrid" style="grid-template-columns:1fr;">
+    <div class="upcomingCol" style="border-color:#e8b3a4;">${homeItemsListHtml(attention, "Nothing overdue. You're all caught up! 🎉")}</div>
+  </div></div>`;
+
+  app.innerHTML = html;
+}
+function statCardHome(icon,label,num,color){
+  return '<div class="stat" style="--sc:'+color+'"><span class="icon">'+icon+'</span><div class="num">'+num+'</div><div class="lbl">'+label+'</div></div>';
+}
+
+/* ================== REPORTS ================== */
+async function refreshReports(){
+  app.innerHTML = '<div class="loading">Loading...</div>';
+  try{
+    customers = await apiList('customers');
+    renderReportsView();
+  }catch(err){
+    app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
+  }
+}
+const REPORT_CATEGORIES = ['Insurance','Real Estate','Mutual Funds'];
+
+function reportMatrixHtml(title, rows, rowKeyFn){
+  let html = `<div class="card" style="margin-bottom:18px;"><div style="padding:14px 16px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--line);">${escapeHtml(title)}</div>
+  <table><thead><tr><th>${rows.label}</th>`;
+  STATUS_LIST.forEach(s=> html += `<th>${s.label}</th>`);
+  html += `<th>Total</th></tr></thead><tbody>`;
+  rows.keys.forEach(key=>{
+    const subset = customers.filter(c=> rowKeyFn(c)===key);
+    html += `<tr><td class="name-cell">${escapeHtml(key)}</td>`;
+    STATUS_LIST.forEach(s=>{
+      const n = subset.filter(c=>c.Status===s.key).length;
+      html += `<td>${n||'-'}</td>`;
+    });
+    html += `<td style="font-weight:700;">${subset.length}</td></tr>`;
+  });
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function renderReportsView(){
+  let html = `<div class="toolbar"><button class="btn-secondary" onclick="downloadFullReportCSV()">⬇️ Download Full Report (CSV)</button></div>`;
+
+  // Category x Status
+  html += reportMatrixHtml('By Service Category', {label:'Category', keys:REPORT_CATEGORIES}, c=>c.Category||'Other');
+
+  // Insurance sub-type x Status
+  const insuranceTypes = [...new Set(customers.filter(c=>c.Category==='Insurance' && c.SubCategory).map(c=>c.SubCategory))];
+  if(insuranceTypes.length>0){
+    html += reportMatrixHtml('Insurance - By Type', {label:'Insurance Type', keys:insuranceTypes}, c=>c.SubCategory);
+  }
+
+  // Real Estate sub-type x Status
+  const reTypes = [...new Set(customers.filter(c=>c.Category==='Real Estate' && c.SubCategory).map(c=>c.SubCategory))];
+  if(reTypes.length>0){
+    html += reportMatrixHtml('Real Estate - By Property Type', {label:'Property Type', keys:reTypes}, c=>c.SubCategory);
+  }
+
+  app.innerHTML = html;
+}
+
+function downloadFullReportCSV(){
+  const header = ['Name','Phone','Category','SubCategory','Company','Status','AppointmentDate','NextFollowupDate','Notes'];
+  const esc = (v)=> '"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const lines = [header.join(',')];
+  customers.forEach(c=>{
+    lines.push(header.map(h=>esc(c[h])).join(','));
+  });
+  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'customer_report_'+todayStr()+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /* ================== SETTINGS ================== */
