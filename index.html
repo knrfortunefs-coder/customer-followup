@@ -1176,8 +1176,34 @@ function renderTodosTable(){
   </table></div>`;
 }
 
+function todoUpcomingPanel(){
+  const d0 = todayStr(), d1 = addDaysStr(d0,1), d2 = addDaysStr(d0,2);
+  const cols = [
+    {cls:'today', label:'Today', date:d0},
+    {cls:'tomorrow', label:'Tomorrow', date:d1},
+    {cls:'dayafter', label:'Day After Tomorrow', date:d2}
+  ];
+  let html = '<div class="upcomingWrap"><div class="upcomingTitle">📅 Tasks - Today &amp; Upcoming (Next 3 Days)</div><div class="upcomingGrid">';
+  cols.forEach(col=>{
+    const items = todos.filter(t=> t.Status!=='Completed' && dtDate(t.DateTime)===col.date);
+    html += `<div class="upcomingCol ${col.cls}"><div class="upcomingColHead"><div><div class="dlabel">${col.label}</div><div class="ddate">${prettyDate(col.date)}</div></div><div class="upcomingCount">${items.length}</div></div>`;
+    if(items.length===0){ html += '<div class="upcomingEmpty">Nothing scheduled</div>'; }
+    else {
+      items.forEach(t=>{
+        html += `<div class="upcomingItem" onclick="openUpdateTodo('${t.ID}')">
+          <div class="uName">${escapeHtml(t.NameOfWork)}</div>
+          <div class="uPhone">${escapeHtml(t.Purpose||'')}</div>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+  html += '</div></div>';
+  return html;
+}
+
 function renderTodosView(){
-  app.innerHTML = renderTodosStats() + renderTodosTable();
+  app.innerHTML = todoUpcomingPanel() + renderTodosStats() + renderTodosTable();
 }
 
 function showTodoModal({title,hint,values,onSave}){
@@ -1346,14 +1372,28 @@ async function refreshReports(){
   }
 }
 const REPORT_CATEGORIES = ['Insurance','Real Estate','Mutual Funds'];
+let reportDateField = 'CreatedDate';
+let reportFromDate = '';
+let reportToDate = '';
 
-function reportMatrixHtml(title, rows, rowKeyFn){
+function getReportFilteredCustomers(){
+  if(!reportFromDate && !reportToDate) return customers;
+  return customers.filter(c=>{
+    const v = normDate(c[reportDateField]);
+    if(!v) return false;
+    if(reportFromDate && v < reportFromDate) return false;
+    if(reportToDate && v > reportToDate) return false;
+    return true;
+  });
+}
+
+function reportMatrixHtml(title, rows, rowKeyFn, dataset){
   let html = `<div class="card" style="margin-bottom:18px;"><div style="padding:14px 16px;font-weight:700;color:var(--navy);border-bottom:1px solid var(--line);">${escapeHtml(title)}</div>
   <table class="matrixTable"><thead><tr><th>${rows.label}</th>`;
   STATUS_LIST.forEach(s=> html += `<th>${s.label}</th>`);
   html += `<th>Total</th></tr></thead><tbody>`;
   rows.keys.forEach(key=>{
-    const subset = customers.filter(c=> rowKeyFn(c)===key);
+    const subset = dataset.filter(c=> rowKeyFn(c)===key);
     html += `<tr><td class="name-cell">${escapeHtml(key)}</td>`;
     STATUS_LIST.forEach(s=>{
       const n = subset.filter(c=>c.Status===s.key).length;
@@ -1365,32 +1405,67 @@ function reportMatrixHtml(title, rows, rowKeyFn){
   return html;
 }
 
+function reportDateFilterBar(){
+  return `<div class="card" style="margin-bottom:18px;padding:14px 16px;">
+    <div style="font-weight:700;color:var(--navy);margin-bottom:10px;">📆 Filter by Date Range</div>
+    <div class="toolbar" style="margin-bottom:0;">
+      <select id="rf_field">
+        <option value="CreatedDate" ${reportDateField==='CreatedDate'?'selected':''}>Date Added</option>
+        <option value="AppointmentDate" ${reportDateField==='AppointmentDate'?'selected':''}>Appointment Date</option>
+        <option value="NextFollowupDate" ${reportDateField==='NextFollowupDate'?'selected':''}>Next Follow-up Date</option>
+      </select>
+      <input type="date" id="rf_from" value="${reportFromDate}">
+      <span style="color:var(--muted);">to</span>
+      <input type="date" id="rf_to" value="${reportToDate}">
+      <button class="btn-primary" onclick="applyReportFilter()">Apply</button>
+      <button class="btn-outline" onclick="clearReportFilter()">Clear</button>
+    </div>
+  </div>`;
+}
+function applyReportFilter(){
+  reportDateField = document.getElementById('rf_field').value;
+  reportFromDate = document.getElementById('rf_from').value;
+  reportToDate = document.getElementById('rf_to').value;
+  renderReportsView();
+}
+function clearReportFilter(){
+  reportFromDate = ''; reportToDate = '';
+  renderReportsView();
+}
+
 function renderReportsView(){
-  let html = `<div class="toolbar"><button class="btn-secondary" onclick="downloadFullReportCSV()">⬇️ Download Full Report (CSV)</button></div>`;
+  const dataset = getReportFilteredCustomers();
+  let html = reportDateFilterBar();
+  html += `<div class="toolbar"><button class="btn-secondary" onclick="downloadFullReportCSV()">⬇️ Download Full Report (CSV)</button>`;
+  if(reportFromDate || reportToDate){
+    html += `<span style="color:var(--muted);font-size:.85rem;">Showing ${dataset.length} of ${customers.length} customers</span>`;
+  }
+  html += `</div>`;
 
   // Category x Status
-  html += reportMatrixHtml('By Service Category', {label:'Category', keys:REPORT_CATEGORIES}, c=>c.Category||'Other');
+  html += reportMatrixHtml('By Service Category', {label:'Category', keys:REPORT_CATEGORIES}, c=>c.Category||'Other', dataset);
 
   // Insurance sub-type x Status
-  const insuranceTypes = [...new Set(customers.filter(c=>c.Category==='Insurance' && c.SubCategory).map(c=>c.SubCategory))];
+  const insuranceTypes = [...new Set(dataset.filter(c=>c.Category==='Insurance' && c.SubCategory).map(c=>c.SubCategory))];
   if(insuranceTypes.length>0){
-    html += reportMatrixHtml('Insurance - By Type', {label:'Insurance Type', keys:insuranceTypes}, c=>c.SubCategory);
+    html += reportMatrixHtml('Insurance - By Type', {label:'Insurance Type', keys:insuranceTypes}, c=>c.SubCategory, dataset);
   }
 
   // Real Estate sub-type x Status
-  const reTypes = [...new Set(customers.filter(c=>c.Category==='Real Estate' && c.SubCategory).map(c=>c.SubCategory))];
+  const reTypes = [...new Set(dataset.filter(c=>c.Category==='Real Estate' && c.SubCategory).map(c=>c.SubCategory))];
   if(reTypes.length>0){
-    html += reportMatrixHtml('Real Estate - By Property Type', {label:'Property Type', keys:reTypes}, c=>c.SubCategory);
+    html += reportMatrixHtml('Real Estate - By Property Type', {label:'Property Type', keys:reTypes}, c=>c.SubCategory, dataset);
   }
 
   app.innerHTML = html;
 }
 
 function downloadFullReportCSV(){
+  const dataset = getReportFilteredCustomers();
   const header = ['Name','Phone','Category','SubCategory','Company','Status','AppointmentDate','NextFollowupDate','Notes'];
   const esc = (v)=> '"'+String(v==null?'':v).replace(/"/g,'""')+'"';
   const lines = [header.join(',')];
-  customers.forEach(c=>{
+  dataset.forEach(c=>{
     lines.push(header.map(h=>esc(c[h])).join(','));
   });
   const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
