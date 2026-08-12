@@ -393,6 +393,7 @@ function renderUpcoming(){
           <div class="uPhone">${escapeHtml(c.Phone)}${phoneActionsHtml(c.Phone, c.Name)}</div>
           ${svc?'<div class="uService">'+escapeHtml(svc)+'</div>':(c.Category?'<div class="uService">'+escapeHtml(c.Category)+'</div>':'')}
           <span class="upcomingTag ${type==='appt'?'tag-appt':'tag-followup'}">${type==='appt'?'Appointment':'Follow-up'}</span>
+          <div style="margin-top:6px;">${customerReminderHtml(c)}</div>
         </div>`;
       });
     }
@@ -473,6 +474,14 @@ function serviceSummary(c){
   }
   return '';
 }
+function customerReminderHtml(c){
+  const dateVal = c.AppointmentDate || c.NextFollowupDate;
+  if(!dateVal) return '';
+  const label = c.AppointmentDate ? 'Appointment' : 'Follow-up';
+  const title = c.Name+' - '+label+(serviceSummary(c)?' ('+serviceSummary(c)+')':'');
+  const link = gcalLink(title, dateVal, '', c.Notes||'', '');
+  return `<a href="${escapeAttr(link)}" target="_blank" rel="noopener" class="btn-outline" onclick="event.stopPropagation()" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">🔔 Remind Me</a>`;
+}
 
 function renderTable(){
   const list = getFiltered();
@@ -486,7 +495,7 @@ function renderTable(){
       <td data-label="Name"><div class="name-cell">${escapeHtml(c.Name)}</div><div class="phone-cell">${escapeHtml(c.Category||'')}</div>${svc?'<div class="sub-cell">'+escapeHtml(svc)+'</div>':''}</td>
       <td data-label="Phone">${escapeHtml(c.Phone)}${phoneActionsHtml(c.Phone, c.Name)}</td>
       <td data-label="Stage"><span class="badge ${sm.cls}">${sm.label}</span></td>
-      <td data-label="Follow-up">${appointmentTag(c.AppointmentDate)}${followupTag(c.NextFollowupDate)}</td>
+      <td data-label="Follow-up">${appointmentTag(c.AppointmentDate)}${followupTag(c.NextFollowupDate)}${customerReminderHtml(c)}</td>
       <td data-label="Notes">${escapeHtml(c.Notes||'')}</td>
       <td data-label="Actions"><div class="rowActions">
         <button class="btn-secondary" onclick="openUpdate('${c.ID}')">Update</button>
@@ -938,7 +947,7 @@ function gcalLink(title, startV, endV, details, location){
     const [d,t] = String(v).split('T');
     if(!d) return '';
     const dd = d.replace(/-/g,'');
-    const tt = t ? t.replace(':','')+'00' : '000000';
+    const tt = t ? t.replace(':','')+'00' : '090000';
     return dd+'T'+tt;
   };
   let s = toGcal(startV);
