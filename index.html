@@ -10,6 +10,7 @@
 <link rel="icon" type="image/png" href="https://i.ibb.co/vCZbChdT/9f4ac37b-ee25-4131-ba6b-4ffb9f153208.png">
 <link rel="apple-touch-icon" href="https://i.ibb.co/vCZbChdT/9f4ac37b-ee25-4131-ba6b-4ffb9f153208.png">
 <title>KNR Fortune Financial Services - Customers Follow-up CRM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --ink:#16233a;
@@ -218,6 +219,12 @@
     .matrixTable{font-size:.78rem;}
     .matrixTable th, .matrixTable td{padding:8px 10px;white-space:nowrap;}
     .rowActions{justify-content:flex-end;}
+  }
+  @media print{
+    header, .tabs, .toolbar, footer, .rowActions{display:none !important;}
+    body{background:#fff;}
+    .card{border:1px solid #999;box-shadow:none;break-inside:avoid;}
+    main{padding:0;max-width:100%;}
   }
 </style>
 </head>
@@ -567,16 +574,31 @@ function onSubcategoryChange(){
   }
 }
 
+function findDuplicatePhone(phone, excludeId){
+  const digits = String(phone||'').replace(/[^\d]/g,'');
+  if(!digits) return null;
+  return customers.find(c=> c.ID!==excludeId && String(c.Phone||'').replace(/[^\d]/g,'')===digits) || null;
+}
 function openAdd(){
   showModal({
     title:'Add New Customer',
     hint:'Fill in the customer details',
     values:{Status:'New', Category:'Insurance'},
     onSave: async (vals)=>{
-      await apiAdd('customers', vals);
+      const dup = findDuplicatePhone(vals.Phone);
+      if(dup){
+        const proceed = confirm('⚠️ A customer with this phone number already exists:\n\n'+dup.Name+' ('+dup.Phone+')\n\nAdd this as a new, separate customer anyway?');
+        if(!proceed){
+          const btn = document.getElementById('saveBtn');
+          if(btn){ btn.disabled=false; btn.textContent='Save'; }
+          return;
+        }
+      }
+      const res = await apiAdd('customers', vals);
+      customers.push({...vals, ID:res.id});
       showToast('Customer saved ✅');
       closeModal();
-      refreshCustomers();
+      render();
     }
   });
 }
@@ -591,9 +613,11 @@ function openUpdate(id){
     onSave: async (vals)=>{
       vals.ID = id;
       await apiUpdate('customers', vals);
+      const idx = customers.findIndex(x=>x.ID===id);
+      if(idx!==-1) customers[idx] = {...customers[idx], ...vals};
       showToast('Update saved ✅');
       closeModal();
-      refreshCustomers();
+      render();
     }
   });
 }
@@ -601,8 +625,9 @@ async function removeCustomer(id,name){
   if(!confirm('Delete '+name+'? This cannot be undone.')) return;
   try{
     await apiDelete('customers', id);
+    customers = customers.filter(c=>c.ID!==id);
     showToast('Deleted');
-    refreshCustomers();
+    render();
   }catch(err){ showToast('Error: '+err.message); }
 }
 
@@ -708,7 +733,10 @@ function handleImportFile(event){
         });
       }
       if(records.length===0){ alert('No valid rows found. Make sure Name and Phone columns are filled in.'); return; }
-      if(!confirm('Import '+records.length+' customers? This will add them to your Google Sheet.')) { event.target.value=''; return; }
+      const dupCount = records.filter(r=> findDuplicatePhone(r.Phone)).length;
+      let msg = 'Import '+records.length+' customers? This will add them to your Google Sheet.';
+      if(dupCount>0) msg += '\n\n⚠️ '+dupCount+' of these phone numbers already exist in your customer list. They will be added as new, separate entries unless you cancel and check your file.';
+      if(!confirm(msg)) { event.target.value=''; return; }
       showToast('Importing '+records.length+' customers...');
       await apiBulkAdd('customers', records);
       showToast(records.length+' customers imported ✅');
@@ -835,9 +863,16 @@ function phoneActionsHtml(phone, name){
 
 /* ================== MEETINGS ================== */
 let meetings = [];
-let meetingFilterType = 'ALL';
+let meetingFilterType = 'Pending';
 const MEETING_PLATFORMS = ['Google Meet','Zoom','Google Teams','Other'];
 const MEETING_COMPANIES = ['LIC','Care Health','Axis Max Life','NSP','NJ Wealth','CSC','Other'];
+const MEETING_STATUS_LIST = [
+  {key:'Pending', label:'Pending', cls:'b-appt'},
+  {key:'Completed', label:'Completed', cls:'b-converted'},
+  {key:'Postponed', label:'Postponed', cls:'b-postponed'},
+  {key:'Cancelled', label:'Cancelled', cls:'b-rejected'}
+];
+function meetingStatusMeta(status){ return MEETING_STATUS_LIST.find(s=>s.key===(status||'Pending')) || MEETING_STATUS_LIST[0]; }
 
 async function refreshMeetings(){
   app.innerHTML = '<div class="loading">Loading...</div>';
@@ -868,7 +903,7 @@ function meetingUpcomingPanel(){
   ];
   let html = '<div class="upcomingWrap"><div class="upcomingTitle">📅 Meetings - Today &amp; Upcoming (Next 3 Days)</div><div class="upcomingGrid">';
   cols.forEach(col=>{
-    const items = meetings.filter(m=> dtDate(m.StartDateTime)===col.date);
+    const items = meetings.filter(m=> dtDate(m.StartDateTime)===col.date && (m.Status||'Pending')!=='Completed' && (m.Status||'Pending')!=='Cancelled');
     html += `<div class="upcomingCol ${col.cls}"><div class="upcomingColHead"><div><div class="dlabel">${col.label}</div><div class="ddate">${prettyDate(col.date)}</div></div><div class="upcomingCount">${items.length}</div></div>`;
     if(items.length===0){ html += '<div class="upcomingEmpty">Nothing scheduled</div>'; }
     else {
@@ -892,9 +927,17 @@ function renderMeetingsStats(){
   const todayCount = meetings.filter(m=>dtDate(m.StartDateTime)===today).length;
   const online = meetings.filter(m=>m.Type==='Online').length;
   const offline = meetings.filter(m=>m.Type==='Offline').length;
+  const pending = meetings.filter(m=>(m.Status||'Pending')==='Pending').length;
+  const completed = meetings.filter(m=>m.Status==='Completed').length;
+  const postponed = meetings.filter(m=>m.Status==='Postponed').length;
+  const cancelled = meetings.filter(m=>m.Status==='Cancelled').length;
   let html = '<div class="stats">';
   html += statCardM('ALL','Total Meetings', total, '🤝', '#2b5c8f');
   html += statCardM('TODAY','Today', todayCount, '📅', '#b8862d');
+  html += statCardM('Pending','Pending', pending, '⏳', '#0f7a6b');
+  html += statCardM('Completed','Completed', completed, '✅', '#1f7a4d');
+  html += statCardM('Postponed','Postponed', postponed, '⏸️', '#c98a2c');
+  html += statCardM('Cancelled','Cancelled', cancelled, '❌', '#b3402f');
   html += statCardM('Online','Online', online, '💻', '#0f7a6b');
   html += statCardM('Offline','Offline', offline, '🏢', '#8a5a4a');
   html += '</div>';
@@ -908,9 +951,11 @@ function setMeetingFilter(key){ meetingFilterType = key; renderMeetingsView(); }
 
 function getFilteredMeetings(){
   return meetings.filter(m=>{
+    const status = m.Status || 'Pending';
     if(meetingFilterType==='TODAY') return dtDate(m.StartDateTime)===todayStr();
     if(meetingFilterType==='Online'||meetingFilterType==='Offline') return m.Type===meetingFilterType;
-    return true;
+    if(['Pending','Completed','Postponed','Cancelled'].indexOf(meetingFilterType)!==-1) return status===meetingFilterType;
+    return true; // 'ALL'
   }).sort((a,b)=> String(a.StartDateTime||'9999').localeCompare(String(b.StartDateTime||'9999')));
 }
 
@@ -977,20 +1022,23 @@ function renderMeetingsTable(){
   let rows = list.map(m=>{
     const joinBtn = (m.Type==='Online' && m.MeetingLink) ? `<a href="${escapeAttr(m.MeetingLink)}" target="_blank" rel="noopener" class="btn-secondary" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;margin-bottom:4px;">Join</a>` : '';
     const remindLink = m.StartDateTime ? `<a href="${escapeAttr(gcalLink(m.MeetingWith+' ('+(m.Company||'Meeting')+')', m.StartDateTime, m.EndDateTime, m.Remarks||'', m.Type==='Offline'?(m.Location||''):(m.MeetingLink||'')))}" target="_blank" rel="noopener" class="btn-outline" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">🔔 Remind Me</a>` : '';
+    const sm = meetingStatusMeta(m.Status);
     return `<tr>
       <td data-label="Meeting With"><div class="name-cell">${escapeHtml(m.MeetingWith)}</div><div class="sub-cell">${escapeHtml(m.Company||'')}</div>${m.Type==='Offline'&&m.Location?'<div class="sub-cell">📍 '+escapeHtml(m.Location)+'</div>':''}</td>
       <td data-label="Type"><span class="badge ${m.Type==='Online'?'b-appt':'b-postponed'}">${escapeHtml(m.Type||'')}</span>${m.Type==='Online'?'<div class="sub-cell">'+escapeHtml(m.Platform||'')+'</div>':''}</td>
+      <td data-label="Status"><span class="badge ${sm.cls}">${sm.label}</span></td>
       <td data-label="Date & Time">${escapeHtml(dtRangePretty(m.StartDateTime, m.EndDateTime))}</td>
       <td data-label="Link">${joinBtn}${remindLink}</td>
       <td data-label="Remarks">${escapeHtml(m.Remarks||'')}</td>
       <td data-label="Actions"><div class="rowActions">
-        <button class="btn-secondary" onclick="openUpdateMeeting('${m.ID}')">Update</button>
+        ${sm.key!=='Completed' ? `<button class="btn-secondary" onclick="quickMeetingStatus('${m.ID}','Completed')">Mark Completed</button>` : ''}
+        <button class="btn-outline" onclick="openUpdateMeeting('${m.ID}')">Update</button>
         <button class="btn-danger" onclick="removeMeeting('${m.ID}','${escapeAttr(m.MeetingWith)}')">Delete</button>
       </div></td>
     </tr>`;
   }).join('');
   return `<div class="card"><table>
-    <thead><tr><th>Meeting With</th><th>Type</th><th>Date &amp; Time</th><th>Link</th><th>Remarks</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Meeting With</th><th>Type</th><th>Status</th><th>Date &amp; Time</th><th>Link</th><th>Remarks</th><th>Actions</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
@@ -1046,6 +1094,9 @@ function showMeetingModal({title,hint,values,onSave}){
       <div class="field"><label>Meeting With *</label><input type="text" id="mf_with" value="${escapeAttr(values.MeetingWith||'')}" placeholder="Person / purpose"></div>
       ${meetingFieldsHtml(values)}
       ${meetingCompanyFieldHtml(values)}
+      <div class="field"><label>Meeting Status</label><select id="mf_status">
+        ${MEETING_STATUS_LIST.map(s=>`<option value="${s.key}" ${(values.Status||'Pending')===s.key?'selected':''}>${s.label}</option>`).join('')}
+      </select></div>
       <div class="field"><label>Start Date &amp; Time *</label><input type="datetime-local" id="mf_start" value="${values.StartDateTime||''}"></div>
       <div class="field"><label>End Date &amp; Time</label><input type="datetime-local" id="mf_end" value="${values.EndDateTime||''}"></div>
       <div class="field"><label>Remarks</label><textarea id="mf_remarks" placeholder="Notes about this meeting...">${escapeHtml(values.Remarks||'')}</textarea></div>
@@ -1071,6 +1122,7 @@ function showMeetingModal({title,hint,values,onSave}){
       MeetingLink: type==='Online' ? (document.getElementById('mf_link')?document.getElementById('mf_link').value.trim():'') : '',
       Location: type==='Offline' ? (document.getElementById('mf_location')?document.getElementById('mf_location').value.trim():'') : '',
       Company: companySel==='Other' ? (companyOther?companyOther.value.trim():'') : companySel,
+      Status: document.getElementById('mf_status').value,
       StartDateTime: start,
       EndDateTime: document.getElementById('mf_end').value,
       Remarks: document.getElementById('mf_remarks').value.trim()
@@ -1084,12 +1136,13 @@ function showMeetingModal({title,hint,values,onSave}){
 
 function openAddMeeting(){
   showMeetingModal({
-    title:'Add New Meeting', hint:'Fill in the meeting details', values:{Type:'Online'},
+    title:'Add New Meeting', hint:'Fill in the meeting details', values:{Type:'Online', Status:'Pending'},
     onSave: async (vals)=>{
-      await apiAdd('meetings', vals);
+      const res = await apiAdd('meetings', vals);
+      meetings.push({...vals, ID:res.id});
       showToast('Meeting saved ✅');
       closeModal();
-      refreshMeetings();
+      renderMeetingsView();
     }
   });
 }
@@ -1101,16 +1154,33 @@ function openUpdateMeeting(id){
     onSave: async (vals)=>{
       vals.ID = id;
       await apiUpdate('meetings', vals);
+      const idx = meetings.findIndex(x=>x.ID===id);
+      if(idx!==-1) meetings[idx] = {...meetings[idx], ...vals};
       showToast('Meeting updated ✅');
       closeModal();
-      refreshMeetings();
+      renderMeetingsView();
     }
   });
 }
 async function removeMeeting(id,name){
   if(!confirm('Delete meeting with '+name+'? This cannot be undone.')) return;
-  try{ await apiDelete('meetings', id); showToast('Deleted'); refreshMeetings(); }
-  catch(err){ showToast('Error: '+err.message); }
+  try{
+    await apiDelete('meetings', id);
+    meetings = meetings.filter(m=>m.ID!==id);
+    showToast('Deleted');
+    renderMeetingsView();
+  }catch(err){ showToast('Error: '+err.message); }
+}
+async function quickMeetingStatus(id, status){
+  const m = meetings.find(x=>x.ID===id);
+  if(!m) return;
+  try{
+    await apiUpdate('meetings', {...m, ID:id, Status:status});
+    const idx = meetings.findIndex(x=>x.ID===id);
+    if(idx!==-1) meetings[idx] = {...meetings[idx], Status:status};
+    showToast('Marked '+status+' ✅');
+    renderMeetingsView();
+  }catch(err){ showToast('Error: '+err.message); }
 }
 
 /* ================== TO-DO LIST ================== */
@@ -1256,10 +1326,11 @@ function openAddTodo(){
   showTodoModal({
     title:'Add New Task', hint:'Fill in the task details', values:{Status:'Pending'},
     onSave: async (vals)=>{
-      await apiAdd('todos', vals);
+      const res = await apiAdd('todos', vals);
+      todos.push({...vals, ID:res.id});
       showToast('Task saved ✅');
       closeModal();
-      refreshTodos();
+      renderTodosView();
     }
   });
 }
@@ -1271,25 +1342,34 @@ function openUpdateTodo(id){
     onSave: async (vals)=>{
       vals.ID = id;
       await apiUpdate('todos', vals);
+      const idx = todos.findIndex(x=>x.ID===id);
+      if(idx!==-1) todos[idx] = {...todos[idx], ...vals};
       showToast('Task updated ✅');
       closeModal();
-      refreshTodos();
+      renderTodosView();
     }
   });
 }
 async function toggleTodoStatus(id){
   const t = todos.find(x=>x.ID===id);
   if(!t) return;
+  const newStatus = t.Status==='Completed' ? 'Pending' : 'Completed';
   try{
-    await apiUpdate('todos', {...t, ID:id, Status: t.Status==='Completed' ? 'Pending' : 'Completed'});
+    await apiUpdate('todos', {...t, ID:id, Status: newStatus});
+    const idx = todos.findIndex(x=>x.ID===id);
+    if(idx!==-1) todos[idx] = {...todos[idx], Status:newStatus};
     showToast('Updated ✅');
-    refreshTodos();
+    renderTodosView();
   }catch(err){ showToast('Error: '+err.message); }
 }
 async function removeTodo(id,name){
   if(!confirm('Delete task "'+name+'"? This cannot be undone.')) return;
-  try{ await apiDelete('todos', id); showToast('Deleted'); refreshTodos(); }
-  catch(err){ showToast('Error: '+err.message); }
+  try{
+    await apiDelete('todos', id);
+    todos = todos.filter(t=>t.ID!==id);
+    showToast('Deleted');
+    renderTodosView();
+  }catch(err){ showToast('Error: '+err.message); }
 }
 
 /* ================== HOME DASHBOARD ================== */
@@ -1313,7 +1393,7 @@ function homeTodayItems(){
     if(next===today && next!==appt) items.push({icon:'🔁', label:'Follow-up', name:c.Name, sub:c.Phone+(serviceSummary(c)?(' · '+serviceSummary(c)):''), onclick:`openUpdate('${c.ID}')`});
   });
   meetings.forEach(m=>{
-    if(dtDate(m.StartDateTime)===today) items.push({icon: m.Type==='Online'?'💻':'🏢', label:m.Type+' Meeting', name:m.MeetingWith, sub:(m.Company||'')+(m.Type==='Offline'&&m.Location?' · '+m.Location:''), onclick:`openUpdateMeeting('${m.ID}')`});
+    if(dtDate(m.StartDateTime)===today && (m.Status||'Pending')!=='Completed' && (m.Status||'Pending')!=='Cancelled') items.push({icon: m.Type==='Online'?'💻':'🏢', label:m.Type+' Meeting', name:m.MeetingWith, sub:(m.Company||'')+(m.Type==='Offline'&&m.Location?' · '+m.Location:''), onclick:`openUpdateMeeting('${m.ID}')`});
   });
   todos.forEach(t=>{
     if(t.Status!=='Completed' && dtDate(t.DateTime)===today) items.push({icon:'✅', label:'Task Due', name:t.NameOfWork, sub:t.Purpose||'', onclick:`openUpdateTodo('${t.ID}')`});
@@ -1341,6 +1421,41 @@ function homeItemsListHtml(items, emptyMsg){
   </div>`).join('');
 }
 
+let globalSearchText = '';
+function globalSearchResults(text){
+  const t = text.toLowerCase();
+  const items = [];
+  customers.forEach(c=>{
+    if(String(c.Name||'').toLowerCase().includes(t) || String(c.Phone||'').includes(t)){
+      items.push({icon:'👥', label:'Customer · '+(statusMeta(c.Status).label), name:c.Name, sub:c.Phone+(serviceSummary(c)?(' · '+serviceSummary(c)):''), onclick:`openUpdate('${c.ID}')`});
+    }
+  });
+  meetings.forEach(m=>{
+    if(String(m.MeetingWith||'').toLowerCase().includes(t) || String(m.Company||'').toLowerCase().includes(t)){
+      items.push({icon:'🤝', label:'Meeting · '+(m.Status||'Pending'), name:m.MeetingWith, sub:dtRangePretty(m.StartDateTime,m.EndDateTime), onclick:`openUpdateMeeting('${m.ID}')`});
+    }
+  });
+  todos.forEach(tk=>{
+    if(String(tk.NameOfWork||'').toLowerCase().includes(t) || String(tk.Purpose||'').toLowerCase().includes(t)){
+      items.push({icon:'✅', label:'Task · '+(tk.Status||'Pending'), name:tk.NameOfWork, sub:tk.Purpose||'', onclick:`openUpdateTodo('${tk.ID}')`});
+    }
+  });
+  return items;
+}
+function onGlobalSearchInput(e){
+  globalSearchText = e.target.value;
+  const resultsBox = document.getElementById('globalSearchResults');
+  if(!resultsBox) return;
+  if(globalSearchText.trim().length===0){
+    resultsBox.innerHTML = '';
+    resultsBox.style.display = 'none';
+    return;
+  }
+  resultsBox.style.display = '';
+  const results = globalSearchResults(globalSearchText.trim());
+  resultsBox.innerHTML = homeItemsListHtml(results, 'No matches found in Customers, Meetings, or Tasks.');
+}
+
 function renderHomeView(){
   const today = todayStr();
   const todayCustomers = customers.filter(c=> normDate(c.AppointmentDate)===today || normDate(c.NextFollowupDate)===today).length;
@@ -1348,7 +1463,12 @@ function renderHomeView(){
   const pendingTasks = todos.filter(t=> t.Status!=='Completed').length;
   const attention = homeAttentionItems();
 
-  let html = '<div class="stats">';
+  let html = `<div class="toolbar">
+    <input type="text" id="globalSearchBox" placeholder="🔎 Search customers, meetings, or tasks by name/phone..." value="${escapeAttr(globalSearchText)}">
+  </div>
+  <div class="card" id="globalSearchResults" style="padding:10px;margin-bottom:18px;display:${globalSearchText?'':'none'};"></div>`;
+
+  html += '<div class="stats">';
   html += statCardHome('👥','Total Customers', customers.length, '#2b5c8f');
   html += statCardHome('📅','Customer Items Today', todayCustomers, '#b8862d');
   html += statCardHome('🤝','Meetings Today', todayMeetings, '#0f7a6b');
@@ -1365,6 +1485,8 @@ function renderHomeView(){
   </div></div>`;
 
   app.innerHTML = html;
+  document.getElementById('globalSearchBox').addEventListener('input', onGlobalSearchInput);
+  if(globalSearchText) onGlobalSearchInput({target:{value:globalSearchText}});
 }
 function statCardHome(icon,label,num,color){
   return '<div class="stat" style="--sc:'+color+'"><span class="icon">'+icon+'</span><div class="num">'+num+'</div><div class="lbl">'+label+'</div></div>';
@@ -1445,7 +1567,11 @@ function clearReportFilter(){
 function renderReportsView(){
   const dataset = getReportFilteredCustomers();
   let html = reportDateFilterBar();
-  html += `<div class="toolbar"><button class="btn-secondary" onclick="downloadFullReportCSV()">⬇️ Download Full Report (CSV)</button>`;
+  html += `<div class="toolbar">
+    <button class="btn-secondary" onclick="downloadFullReportCSV()">⬇️ Download Full Report (CSV)</button>
+    <button class="btn-secondary" onclick="shareReportWhatsApp()">📤 Share Summary (WhatsApp)</button>
+    <button class="btn-outline" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    <button class="btn-outline" onclick="downloadFullBackupExcel()">⬇️ Full Backup (Excel)</button>`;
   if(reportFromDate || reportToDate){
     html += `<span style="color:var(--muted);font-size:.85rem;">Showing ${dataset.length} of ${customers.length} customers</span>`;
   }
@@ -1483,6 +1609,44 @@ function downloadFullReportCSV(){
   a.href = url; a.download = 'customer_report_'+todayStr()+'.csv';
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+}
+
+function shareReportWhatsApp(){
+  const dataset = getReportFilteredCustomers();
+  let msg = '*KNR Fortune Financial Services*\nCustomer Report';
+  if(reportFromDate || reportToDate) msg += ' ('+(reportFromDate||'start')+' to '+(reportToDate||'today')+')';
+  msg += '\n\n';
+  REPORT_CATEGORIES.forEach(cat=>{
+    const subset = dataset.filter(c=>(c.Category||'Other')===cat);
+    if(subset.length===0) return;
+    msg += '*'+cat+'* - Total: '+subset.length+'\n';
+    STATUS_LIST.forEach(s=>{
+      const n = subset.filter(c=>c.Status===s.key).length;
+      if(n>0) msg += '  '+s.label+': '+n+'\n';
+    });
+    msg += '\n';
+  });
+  msg += 'Total Customers: '+dataset.length;
+  window.open('https://wa.me/?text='+encodeURIComponent(msg), '_blank');
+}
+
+async function downloadFullBackupExcel(){
+  if(typeof XLSX === 'undefined'){ alert('Excel library did not load. Please check your internet connection and try again.'); return; }
+  showToast('Preparing backup...');
+  try{
+    const [cust, meet, task, hist] = await Promise.all([
+      apiList('customers'), apiList('meetings'), apiList('todos'), apiList('history')
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cust), 'Customers');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(meet), 'Meetings');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(task), 'Todos');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(hist), 'History');
+    XLSX.writeFile(wb, 'KNR_Fortune_CRM_Backup_'+todayStr()+'.xlsx');
+    showToast('Backup downloaded ✅');
+  }catch(err){
+    alert('Backup failed: '+err.message);
+  }
 }
 
 /* ================== SETTINGS ================== */
