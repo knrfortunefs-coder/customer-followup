@@ -1389,11 +1389,15 @@ function homeTodayItems(){
   const items = [];
   customers.forEach(c=>{
     const appt = normDate(c.AppointmentDate), next = normDate(c.NextFollowupDate);
-    if(appt===today) items.push({icon:'📅', label:'Appointment', name:c.Name, sub:c.Phone+(serviceSummary(c)?(' · '+serviceSummary(c)):''), onclick:`openUpdate('${c.ID}')`});
-    if(next===today && next!==appt) items.push({icon:'🔁', label:'Follow-up', name:c.Name, sub:c.Phone+(serviceSummary(c)?(' · '+serviceSummary(c)):''), onclick:`openUpdate('${c.ID}')`});
+    const actions = phoneActionsHtml(c.Phone, c.Name);
+    if(appt===today) items.push({icon:'📅', label:'Appointment', name:c.Name, sub:c.Phone+(serviceSummary(c)?(' · '+serviceSummary(c)):''), onclick:`openUpdate('${c.ID}')`, actions});
+    if(next===today && next!==appt) items.push({icon:'🔁', label:'Follow-up', name:c.Name, sub:c.Phone+(serviceSummary(c)?(' · '+serviceSummary(c)):''), onclick:`openUpdate('${c.ID}')`, actions});
   });
   meetings.forEach(m=>{
-    if(dtDate(m.StartDateTime)===today && (m.Status||'Pending')!=='Completed' && (m.Status||'Pending')!=='Cancelled') items.push({icon: m.Type==='Online'?'💻':'🏢', label:m.Type+' Meeting', name:m.MeetingWith, sub:(m.Company||'')+(m.Type==='Offline'&&m.Location?' · '+m.Location:''), onclick:`openUpdateMeeting('${m.ID}')`});
+    if(dtDate(m.StartDateTime)===today && (m.Status||'Pending')!=='Completed' && (m.Status||'Pending')!=='Cancelled'){
+      const joinBtn = (m.Type==='Online' && m.MeetingLink) ? `<a href="${escapeAttr(m.MeetingLink)}" target="_blank" rel="noopener" class="btn-secondary" onclick="event.stopPropagation()" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">Join</a>` : '';
+      items.push({icon: m.Type==='Online'?'💻':'🏢', label:m.Type+' Meeting', name:m.MeetingWith, sub:(m.Company||'')+(m.Type==='Offline'&&m.Location?' · '+m.Location:''), onclick:`openUpdateMeeting('${m.ID}')`, actions:joinBtn?`<div class="phoneActions" onclick="event.stopPropagation()">${joinBtn}</div>`:''});
+    }
   });
   todos.forEach(t=>{
     if(t.Status!=='Completed' && dtDate(t.DateTime)===today) items.push({icon:'✅', label:'Task Due', name:t.NameOfWork, sub:t.Purpose||'', onclick:`openUpdateTodo('${t.ID}')`});
@@ -1405,7 +1409,7 @@ function homeAttentionItems(){
   const items = [];
   customers.forEach(c=>{
     const next = normDate(c.NextFollowupDate);
-    if(next && next<today) items.push({icon:'⚠️', label:'Missed Follow-up', name:c.Name, sub:c.Phone, onclick:`openUpdate('${c.ID}')`});
+    if(next && next<today) items.push({icon:'⚠️', label:'Missed Follow-up', name:c.Name, sub:c.Phone, onclick:`openUpdate('${c.ID}')`, actions:phoneActionsHtml(c.Phone, c.Name)});
   });
   todos.forEach(t=>{
     if(t.Status!=='Completed' && dtDate(t.DateTime) && dtDate(t.DateTime)<today) items.push({icon:'⚠️', label:'Overdue Task', name:t.NameOfWork, sub:t.Purpose||'', onclick:`openUpdateTodo('${t.ID}')`});
@@ -1416,7 +1420,7 @@ function homeItemsListHtml(items, emptyMsg){
   if(items.length===0) return '<div class="upcomingEmpty">'+emptyMsg+'</div>';
   return items.map(it=>`<div class="upcomingItem" onclick="${it.onclick}">
     <div class="uName">${it.icon} ${escapeHtml(it.name)}</div>
-    <div class="uPhone">${escapeHtml(it.sub||'')}</div>
+    <div class="uPhone">${escapeHtml(it.sub||'')}${it.actions||''}</div>
     <span class="upcomingTag tag-followup">${escapeHtml(it.label)}</span>
   </div>`).join('');
 }
@@ -1427,12 +1431,13 @@ function globalSearchResults(text){
   const items = [];
   customers.forEach(c=>{
     if(String(c.Name||'').toLowerCase().includes(t) || String(c.Phone||'').includes(t)){
-      items.push({icon:'👥', label:'Customer · '+(statusMeta(c.Status).label), name:c.Name, sub:c.Phone+(serviceSummary(c)?(' · '+serviceSummary(c)):''), onclick:`openUpdate('${c.ID}')`});
+      items.push({icon:'👥', label:'Customer · '+(statusMeta(c.Status).label), name:c.Name, sub:c.Phone+(serviceSummary(c)?(' · '+serviceSummary(c)):''), onclick:`openUpdate('${c.ID}')`, actions:phoneActionsHtml(c.Phone, c.Name)});
     }
   });
   meetings.forEach(m=>{
     if(String(m.MeetingWith||'').toLowerCase().includes(t) || String(m.Company||'').toLowerCase().includes(t)){
-      items.push({icon:'🤝', label:'Meeting · '+(m.Status||'Pending'), name:m.MeetingWith, sub:dtRangePretty(m.StartDateTime,m.EndDateTime), onclick:`openUpdateMeeting('${m.ID}')`});
+      const joinBtn = (m.Type==='Online' && m.MeetingLink) ? `<a href="${escapeAttr(m.MeetingLink)}" target="_blank" rel="noopener" class="btn-secondary" onclick="event.stopPropagation()" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">Join</a>` : '';
+      items.push({icon:'🤝', label:'Meeting · '+(m.Status||'Pending'), name:m.MeetingWith, sub:dtRangePretty(m.StartDateTime,m.EndDateTime), onclick:`openUpdateMeeting('${m.ID}')`, actions:joinBtn?`<div class="phoneActions" onclick="event.stopPropagation()">${joinBtn}</div>`:''});
     }
   });
   todos.forEach(tk=>{
