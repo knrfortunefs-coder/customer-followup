@@ -30,7 +30,7 @@
     --radius:10px;
   }
   *{box-sizing:border-box;}
-  html,body{overflow-x:hidden;max-width:100%;}
+  html,body{overflow-x:hidden;max-width:100%;overscroll-behavior-y:contain;}
   body{
     margin:0;
     font-family:'Segoe UI',Arial,sans-serif;
@@ -258,13 +258,109 @@
   <div class="loading">Loading...</div>
 </main>
 
-<footer>Your data is stored safely in your Google Sheet.</footer>
+<footer>Your data is stored safely in your Google Sheet.<br><span id="syncStatus" style="font-size:.72rem;"></span></footer>
 
 <script>
 /* ================== STORAGE (persists on this hosted site via localStorage) ================== */
 function lsGet(key){ try{ return localStorage.getItem(key); }catch(e){ return null; } }
 function lsSet(key,val){ try{ localStorage.setItem(key,val); }catch(e){} }
 function lsRemove(key){ try{ localStorage.removeItem(key); }catch(e){} }
+
+
+/* ================== OFFLINE-FIRST CACHE ================== */
+// Every entity list is cached locally after a successful fetch, and shown
+// immediately on next load (even with no internet) while a fresh copy is
+// fetched quietly in the background.
+function loadCache(entity){
+  try{
+    const raw = localStorage.getItem('cf_cache_'+entity);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+function saveCache(entity, data){
+  try{
+    localStorage.setItem('cf_cache_'+entity, JSON.stringify(data));
+    localStorage.setItem('cf_cache_'+entity+'_time', String(Date.now()));
+  }catch(e){}
+}
+function cacheTime(entity){
+  try{ return parseInt(localStorage.getItem('cf_cache_'+entity+'_time')||'0',10); }catch(e){ return 0; }
+}
+function timeAgo(ms){
+  if(!ms) return '';
+  const diff = Math.max(0, Date.now()-ms);
+  const mins = Math.floor(diff/60000);
+  if(mins<1) return 'just now';
+  if(mins<60) return mins+' min ago';
+  const hrs = Math.floor(mins/60);
+  if(hrs<24) return hrs+' hr ago';
+  return Math.floor(hrs/24)+' day(s) ago';
+}
+let syncStatusTimer = null;
+function setSyncStatus(state, entity){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  clearTimeout(syncStatusTimer);
+  if(state==='synced'){
+    el.textContent = '● Synced just now';
+    el.style.color = 'var(--ok)';
+  } else if(state==='offline'){
+    el.textContent = '● Offline — showing last synced data ('+timeAgo(cacheTime(entity))+')';
+    el.style.color = 'var(--warn)';
+  } else if(state==='syncing'){
+    el.textContent = '● Syncing…';
+    el.style.color = 'var(--muted)';
+  } else if(state==='nodata'){
+    el.textContent = '● No internet connection — no data cached yet';
+    el.style.color = 'var(--danger)';
+  }
+}
+// Generic offline-first loader: shows cached data instantly, then fetches
+// fresh data in the background without blocking the screen.
+const entitySyncInProgress = {};
+async function loadEntityOfflineFirst(entity, applyFn, renderFn){
+  const cached = loadCache(entity);
+  if(cached){
+    applyFn(cached);
+    renderFn();
+    setSyncStatus('syncing', entity);
+  } else {
+    app.innerHTML = '<div class="loading">Loading...</div>';
+  }
+
+  if(entitySyncInProgress[entity]) return; // don't stack up duplicate syncs (e.g. rapid pull-to-refresh)
+
+  if(!navigator.onLine){
+    if(cached){
+      setSyncStatus('offline', entity);
+      showToast('No internet connection. Showing last synced data.', 2200);
+    } else {
+      setSyncStatus('nodata', entity);
+      app.innerHTML = '<div class="empty"><h3>No internet connection</h3><p>Initial data cannot be loaded yet. Please connect to the internet and try again.</p><button class="btn-primary" onclick="loadCurrentView()">Retry</button></div>';
+    }
+    return;
+  }
+
+  entitySyncInProgress[entity] = true;
+  try{
+    const fresh = await apiList(entity);
+    applyFn(fresh);
+    saveCache(entity, fresh);
+    renderFn();
+    setSyncStatus('synced', entity);
+    if(cached) showToast('Latest data synced ✅', 1500);
+  }catch(err){
+    if(cached){
+      setSyncStatus('offline', entity);
+      showToast('Unable to sync. Showing last synced data.', 2200);
+    } else {
+      setSyncStatus('nodata', entity);
+      app.innerHTML = '<div class="empty"><h3>No internet connection</h3><p>Could not load data and nothing is cached yet on this device. Please connect to the internet and try again.</p><button class="btn-primary" onclick="loadCurrentView()">Retry</button></div>';
+    }
+  } finally {
+    entitySyncInProgress[entity] = false;
+  }
+}
 
 let WEBAPP_URL = lsGet('cf_webapp_url') || 'https://script.google.com/macros/s/AKfycbzRJ5vwe2IECh7U4rVcmpBzso58GiY7mkE5S98fqj9zxduvSXLh2tOUq0oaVy1Cp-wZ/exec';
 function saveConfig(url){ WEBAPP_URL = url; lsSet('cf_webapp_url', url); }
@@ -531,13 +627,7 @@ function escapeAttr(s){ return escapeHtml(s).replace(/'/g,'&#39;'); }
 
 /* ================== LOAD DATA ================== */
 async function refreshCustomers(){
-  app.innerHTML = '<div class="loading">Loading...</div>';
-  try{
-    customers = await apiList('customers');
-    render();
-  }catch(err){
-    app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
-  }
+  await loadEntityOfflineFirst('customers', (data)=>{ customers = data; }, render);
 }
 
 /* ================== ADD / UPDATE MODAL ================== */
@@ -596,6 +686,7 @@ function openAdd(){
       }
       const res = await apiAdd('customers', vals);
       customers.push({...vals, ID:res.id});
+      saveCache('customers', customers);
       showToast('Customer saved ✅');
       closeModal();
       render();
@@ -615,6 +706,7 @@ function openUpdate(id){
       await apiUpdate('customers', vals);
       const idx = customers.findIndex(x=>x.ID===id);
       if(idx!==-1) customers[idx] = {...customers[idx], ...vals};
+      saveCache('customers', customers);
       showToast('Update saved ✅');
       closeModal();
       render();
@@ -626,6 +718,7 @@ async function removeCustomer(id,name){
   try{
     await apiDelete('customers', id);
     customers = customers.filter(c=>c.ID!==id);
+    saveCache('customers', customers);
     showToast('Deleted');
     render();
   }catch(err){ showToast('Error: '+err.message); }
@@ -809,13 +902,13 @@ function closeModal(){
 
 /* ================== TOAST ================== */
 let toastTimer;
-function showToast(msg){
+function showToast(msg, duration){
   let t = document.getElementById('toast');
   if(!t){ t = document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove('show'), 2500);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), duration||2500);
 }
 
 /* ================== VIEW SWITCHING ================== */
@@ -875,13 +968,7 @@ const MEETING_STATUS_LIST = [
 function meetingStatusMeta(status){ return MEETING_STATUS_LIST.find(s=>s.key===(status||'Pending')) || MEETING_STATUS_LIST[0]; }
 
 async function refreshMeetings(){
-  app.innerHTML = '<div class="loading">Loading...</div>';
-  try{
-    meetings = await apiList('meetings');
-    renderMeetingsView();
-  }catch(err){
-    app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
-  }
+  await loadEntityOfflineFirst('meetings', (data)=>{ meetings = data; }, renderMeetingsView);
 }
 
 function dtDate(v){ return v ? String(v).substring(0,10) : ''; }
@@ -1140,6 +1227,7 @@ function openAddMeeting(){
     onSave: async (vals)=>{
       const res = await apiAdd('meetings', vals);
       meetings.push({...vals, ID:res.id});
+      saveCache('meetings', meetings);
       showToast('Meeting saved ✅');
       closeModal();
       renderMeetingsView();
@@ -1156,6 +1244,7 @@ function openUpdateMeeting(id){
       await apiUpdate('meetings', vals);
       const idx = meetings.findIndex(x=>x.ID===id);
       if(idx!==-1) meetings[idx] = {...meetings[idx], ...vals};
+      saveCache('meetings', meetings);
       showToast('Meeting updated ✅');
       closeModal();
       renderMeetingsView();
@@ -1167,6 +1256,7 @@ async function removeMeeting(id,name){
   try{
     await apiDelete('meetings', id);
     meetings = meetings.filter(m=>m.ID!==id);
+    saveCache('meetings', meetings);
     showToast('Deleted');
     renderMeetingsView();
   }catch(err){ showToast('Error: '+err.message); }
@@ -1178,6 +1268,7 @@ async function quickMeetingStatus(id, status){
     await apiUpdate('meetings', {...m, ID:id, Status:status});
     const idx = meetings.findIndex(x=>x.ID===id);
     if(idx!==-1) meetings[idx] = {...meetings[idx], Status:status};
+    saveCache('meetings', meetings);
     showToast('Marked '+status+' ✅');
     renderMeetingsView();
   }catch(err){ showToast('Error: '+err.message); }
@@ -1185,16 +1276,10 @@ async function quickMeetingStatus(id, status){
 
 /* ================== TO-DO LIST ================== */
 let todos = [];
-let todoFilter = 'ALL';
+let todoFilter = 'PENDING';
 
 async function refreshTodos(){
-  app.innerHTML = '<div class="loading">Loading...</div>';
-  try{
-    todos = await apiList('todos');
-    renderTodosView();
-  }catch(err){
-    app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
-  }
+  await loadEntityOfflineFirst('todos', (data)=>{ todos = data; }, renderTodosView);
 }
 
 function renderTodosStats(){
@@ -1328,6 +1413,7 @@ function openAddTodo(){
     onSave: async (vals)=>{
       const res = await apiAdd('todos', vals);
       todos.push({...vals, ID:res.id});
+      saveCache('todos', todos);
       showToast('Task saved ✅');
       closeModal();
       renderTodosView();
@@ -1344,6 +1430,7 @@ function openUpdateTodo(id){
       await apiUpdate('todos', vals);
       const idx = todos.findIndex(x=>x.ID===id);
       if(idx!==-1) todos[idx] = {...todos[idx], ...vals};
+      saveCache('todos', todos);
       showToast('Task updated ✅');
       closeModal();
       renderTodosView();
@@ -1358,6 +1445,7 @@ async function toggleTodoStatus(id){
     await apiUpdate('todos', {...t, ID:id, Status: newStatus});
     const idx = todos.findIndex(x=>x.ID===id);
     if(idx!==-1) todos[idx] = {...todos[idx], Status:newStatus};
+    saveCache('todos', todos);
     showToast('Updated ✅');
     renderTodosView();
   }catch(err){ showToast('Error: '+err.message); }
@@ -1367,20 +1455,59 @@ async function removeTodo(id,name){
   try{
     await apiDelete('todos', id);
     todos = todos.filter(t=>t.ID!==id);
+    saveCache('todos', todos);
     showToast('Deleted');
     renderTodosView();
   }catch(err){ showToast('Error: '+err.message); }
 }
 
 /* ================== HOME DASHBOARD ================== */
+let homeSyncInProgress = false;
 async function refreshHome(){
-  app.innerHTML = '<div class="loading">Loading...</div>';
-  try{
-    const [c, m, t] = await Promise.all([apiList('customers'), apiList('meetings'), apiList('todos')]);
-    customers = c; meetings = m; todos = t;
+  const cc = loadCache('customers'), cm = loadCache('meetings'), ct = loadCache('todos');
+  const haveAnyCache = cc || cm || ct;
+  if(haveAnyCache){
+    customers = cc || []; meetings = cm || []; todos = ct || [];
     renderHomeView();
-  }catch(err){
-    app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
+    setSyncStatus('syncing', 'customers');
+  } else {
+    app.innerHTML = '<div class="loading">Loading...</div>';
+  }
+
+  if(homeSyncInProgress) return;
+
+  if(!navigator.onLine){
+    if(haveAnyCache){
+      setSyncStatus('offline', 'customers');
+      showToast('No internet connection. Showing last synced data.', 2200);
+    } else {
+      setSyncStatus('nodata', 'customers');
+      app.innerHTML = '<div class="empty"><h3>No internet connection</h3><p>Initial data cannot be loaded yet. Please connect to the internet and try again.</p><button class="btn-primary" onclick="loadCurrentView()">Retry</button></div>';
+    }
+    return;
+  }
+
+  homeSyncInProgress = true;
+  const results = await Promise.allSettled([apiList('customers'), apiList('meetings'), apiList('todos')]);
+  homeSyncInProgress = false;
+  const [rc, rm, rt] = results;
+  let anySuccess = false;
+  if(rc.status==='fulfilled'){ customers = rc.value; saveCache('customers', rc.value); anySuccess = true; }
+  if(rm.status==='fulfilled'){ meetings = rm.value; saveCache('meetings', rm.value); anySuccess = true; }
+  if(rt.status==='fulfilled'){ todos = rt.value; saveCache('todos', rt.value); anySuccess = true; }
+  const allFailed = results.every(r=>r.status==='rejected');
+  if(allFailed && !haveAnyCache){
+    setSyncStatus('nodata','customers');
+    app.innerHTML = '<div class="empty"><h3>No internet connection</h3><p>Could not load data and nothing is cached yet on this device. Please connect to the internet and try again.</p><button class="btn-primary" onclick="loadCurrentView()">Retry</button></div>';
+    return;
+  }
+  renderHomeView();
+  if(allFailed){
+    setSyncStatus('offline','customers');
+    showToast('Unable to sync. Showing last synced data.', 2200);
+  } else {
+    setSyncStatus('synced','customers');
+    if(haveAnyCache && anySuccess) showToast('Latest data synced ✅', 1500);
   }
 }
 
@@ -1499,13 +1626,7 @@ function statCardHome(icon,label,num,color){
 
 /* ================== REPORTS ================== */
 async function refreshReports(){
-  app.innerHTML = '<div class="loading">Loading...</div>';
-  try{
-    customers = await apiList('customers');
-    renderReportsView();
-  }catch(err){
-    app.innerHTML = '<div class="empty"><h3>Could not load data</h3><p>'+escapeHtml(err.message)+'</p><p>Please check the Web App URL in Settings.</p></div>';
-  }
+  await loadEntityOfflineFirst('customers', (data)=>{ customers = data; }, renderReportsView);
 }
 const REPORT_CATEGORIES = ['Insurance','Real Estate','Mutual Funds'];
 let reportDateField = 'CreatedDate';
@@ -1906,6 +2027,73 @@ async function submitRecoverAnswer(){
 function startPinSetupFlow(isChange){
   renderLockScreen('setup1');
 }
+
+/* ================== NETWORK RECONNECTION ================== */
+window.addEventListener('online', ()=>{
+  showToast('Internet restored. Syncing latest data...', 1800);
+  loadCurrentView();
+});
+window.addEventListener('offline', ()=>{
+  const entity = currentView==='home' ? 'customers' : currentView;
+  setSyncStatus('offline', entity);
+  showToast('No internet connection. Showing last synced data.', 2200);
+});
+
+/* ================== PULL-TO-REFRESH ================== */
+// Custom pull-down-to-sync gesture that only fires when the page is scrolled
+// to the very top. This replaces the browser's native pull-to-refresh (which
+// can feel like the screen jumping / behaving oddly) with a safe in-app sync
+// that never logs out, never navigates away, and never clears existing data.
+(function setupPullToRefresh(){
+  let startY = 0, pulling = false, triggered = false;
+  const THRESHOLD = 70;
+  let indicator = null;
+
+  function ensureIndicator(){
+    if(indicator) return indicator;
+    indicator = document.createElement('div');
+    indicator.id = 'ptrIndicator';
+    indicator.style.cssText = 'position:fixed;top:0;left:0;right:0;text-align:center;padding:10px;font-size:.82rem;color:#fff;background:var(--navy);transform:translateY(-100%);transition:transform .15s;z-index:300;';
+    indicator.textContent = '↓ Pull down to refresh';
+    document.body.appendChild(indicator);
+    return indicator;
+  }
+
+  document.addEventListener('touchstart', (e)=>{
+    if(document.getElementById('lockWrap') || document.getElementById('overlay')) return; // don't interfere with lock screen or modals
+    if(window.scrollY > 0) return;
+    startY = e.touches[0].clientY;
+    pulling = true;
+    triggered = false;
+  }, {passive:true});
+
+  document.addEventListener('touchmove', (e)=>{
+    if(!pulling) return;
+    const dy = e.touches[0].clientY - startY;
+    if(dy > 10 && window.scrollY === 0){
+      const el = ensureIndicator();
+      const pull = Math.min(dy, 120);
+      el.style.transform = 'translateY('+(pull-40)+'px)';
+      el.textContent = pull > THRESHOLD ? '↑ Release to refresh' : '↓ Pull down to refresh';
+      triggered = pull > THRESHOLD;
+    }
+  }, {passive:true});
+
+  document.addEventListener('touchend', ()=>{
+    if(!pulling) return;
+    pulling = false;
+    if(indicator) indicator.style.transform = 'translateY(-100%)';
+    if(triggered){
+      triggered = false;
+      if(!navigator.onLine){
+        showToast('No internet connection. Showing last synced data.', 2200);
+      } else {
+        showToast('Refreshing...', 1000);
+      }
+      loadCurrentView();
+    }
+  }, {passive:true});
+})();
 
 /* ================== BOOT ================== */
 (function boot(){
