@@ -941,6 +941,11 @@ function cleanPhoneForWa(phone){
   return d;
 }
 function telLink(phone){ return 'tel:'+String(phone||'').replace(/[^\d+]/g,''); }
+function mapsLink(location){ return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(location); }
+function locationHtml(location){
+  if(!location) return '';
+  return '📍 <a href="'+escapeAttr(mapsLink(location))+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--teal);text-decoration:underline;">'+escapeHtml(location)+'</a>';
+}
 function waLink(phone, msg){
   const d = cleanPhoneForWa(phone);
   return 'https://wa.me/'+d+(msg?('?text='+encodeURIComponent(msg)):'');
@@ -997,7 +1002,7 @@ function meetingUpcomingPanel(){
       items.forEach(m=>{
         html += `<div class="upcomingItem" onclick="openUpdateMeeting('${m.ID}')">
           <div class="uName">${escapeHtml(m.MeetingWith)}</div>
-          <div class="uPhone">${escapeHtml(m.Company||'')}${m.Type==='Offline'&&m.Location?' · '+escapeHtml(m.Location):''}</div>
+          <div class="uPhone">${escapeHtml(m.Company||'')}${m.Type==='Offline'&&m.Location?' · '+locationHtml(m.Location):''}</div>
           <span class="upcomingTag ${m.Type==='Online'?'tag-appt':'tag-followup'}">${m.Type==='Online'?('Online · '+escapeHtml(m.Platform||'')):'Offline'}</span>
         </div>`;
       });
@@ -1111,7 +1116,7 @@ function renderMeetingsTable(){
     const remindLink = m.StartDateTime ? `<a href="${escapeAttr(gcalLink(m.MeetingWith+' ('+(m.Company||'Meeting')+')', m.StartDateTime, m.EndDateTime, m.Remarks||'', m.Type==='Offline'?(m.Location||''):(m.MeetingLink||'')))}" target="_blank" rel="noopener" class="btn-outline" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">🔔 Remind Me</a>` : '';
     const sm = meetingStatusMeta(m.Status);
     return `<tr>
-      <td data-label="Meeting With"><div class="name-cell">${escapeHtml(m.MeetingWith)}</div><div class="sub-cell">${escapeHtml(m.Company||'')}</div>${m.Type==='Offline'&&m.Location?'<div class="sub-cell">📍 '+escapeHtml(m.Location)+'</div>':''}</td>
+      <td data-label="Meeting With"><div class="name-cell">${escapeHtml(m.MeetingWith)}</div><div class="sub-cell">${escapeHtml(m.Company||'')}</div>${m.Type==='Offline'&&m.Location?'<div class="sub-cell">'+locationHtml(m.Location)+'</div>':''}</td>
       <td data-label="Type"><span class="badge ${m.Type==='Online'?'b-appt':'b-postponed'}">${escapeHtml(m.Type||'')}</span>${m.Type==='Online'?'<div class="sub-cell">'+escapeHtml(m.Platform||'')+'</div>':''}</td>
       <td data-label="Status"><span class="badge ${sm.cls}">${sm.label}</span></td>
       <td data-label="Date & Time">${escapeHtml(dtRangePretty(m.StartDateTime, m.EndDateTime))}</td>
@@ -1153,7 +1158,7 @@ function meetingTypeFieldsHtml(values){
     html += `<div class="field"><label>Meeting Link</label><input type="text" id="mf_link" value="${escapeAttr(values.MeetingLink||'')}" placeholder="https://meet.google.com/..."></div>`;
     return html;
   }
-  return `<div class="field"><label>Meeting Location</label><input type="text" id="mf_location" value="${escapeAttr(values.Location||'')}" placeholder="Office address / place name"></div>`;
+  return `<div class="field"><label>Meeting Location <span style="font-weight:400;color:var(--muted);">(optional)</span></label><input type="text" id="mf_location" value="${escapeAttr(values.Location||'')}" placeholder="Office address / place name (optional)"></div>`;
 }
 function onMeetingTypeChange(){
   const type = document.getElementById('mf_type').value;
@@ -1523,7 +1528,9 @@ function homeTodayItems(){
   meetings.forEach(m=>{
     if(dtDate(m.StartDateTime)===today && (m.Status||'Pending')!=='Completed' && (m.Status||'Pending')!=='Cancelled'){
       const joinBtn = (m.Type==='Online' && m.MeetingLink) ? `<a href="${escapeAttr(m.MeetingLink)}" target="_blank" rel="noopener" class="btn-secondary" onclick="event.stopPropagation()" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">Join</a>` : '';
-      items.push({icon: m.Type==='Online'?'💻':'🏢', label:m.Type+' Meeting', name:m.MeetingWith, sub:(m.Company||'')+(m.Type==='Offline'&&m.Location?' · '+m.Location:''), onclick:`openUpdateMeeting('${m.ID}')`, actions:joinBtn?`<div class="phoneActions" onclick="event.stopPropagation()">${joinBtn}</div>`:''});
+      const mapBtn = (m.Type==='Offline' && m.Location) ? `<a href="${escapeAttr(mapsLink(m.Location))}" target="_blank" rel="noopener" class="btn-secondary" onclick="event.stopPropagation()" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">📍 Map</a>` : '';
+      const actionsHtml = (joinBtn||mapBtn) ? `<div class="phoneActions" onclick="event.stopPropagation()">${joinBtn}${mapBtn}</div>` : '';
+      items.push({icon: m.Type==='Online'?'💻':'🏢', label:m.Type+' Meeting', name:m.MeetingWith, sub:(m.Company||'')+(m.Type==='Offline'&&m.Location?' · '+m.Location:''), onclick:`openUpdateMeeting('${m.ID}')`, actions:actionsHtml});
     }
   });
   todos.forEach(t=>{
@@ -1564,7 +1571,9 @@ function globalSearchResults(text){
   meetings.forEach(m=>{
     if(String(m.MeetingWith||'').toLowerCase().includes(t) || String(m.Company||'').toLowerCase().includes(t)){
       const joinBtn = (m.Type==='Online' && m.MeetingLink) ? `<a href="${escapeAttr(m.MeetingLink)}" target="_blank" rel="noopener" class="btn-secondary" onclick="event.stopPropagation()" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">Join</a>` : '';
-      items.push({icon:'🤝', label:'Meeting · '+(m.Status||'Pending'), name:m.MeetingWith, sub:dtRangePretty(m.StartDateTime,m.EndDateTime), onclick:`openUpdateMeeting('${m.ID}')`, actions:joinBtn?`<div class="phoneActions" onclick="event.stopPropagation()">${joinBtn}</div>`:''});
+      const mapBtn = (m.Type==='Offline' && m.Location) ? `<a href="${escapeAttr(mapsLink(m.Location))}" target="_blank" rel="noopener" class="btn-secondary" onclick="event.stopPropagation()" style="display:inline-block;text-decoration:none;padding:6px 10px;font-size:.78rem;">📍 Map</a>` : '';
+      const actionsHtml = (joinBtn||mapBtn) ? `<div class="phoneActions" onclick="event.stopPropagation()">${joinBtn}${mapBtn}</div>` : '';
+      items.push({icon:'🤝', label:'Meeting · '+(m.Status||'Pending'), name:m.MeetingWith, sub:dtRangePretty(m.StartDateTime,m.EndDateTime), onclick:`openUpdateMeeting('${m.ID}')`, actions:actionsHtml});
     }
   });
   todos.forEach(tk=>{
